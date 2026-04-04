@@ -22,6 +22,8 @@ import TextBasedAnswer, {
   getAnswerIsFinished,
 } from '@/components/pages/home/promptThread/TextBasedAnswer';
 import ChartAnswer from '@/components/pages/home/promptThread/ChartAnswer';
+import InlineTrace from '@/components/trace/InlineTrace';
+import ThunderboltOutlined from '@ant-design/icons/ThunderboltOutlined';
 import Preparation from '@/components/pages/home/preparation';
 import {
   AskingTaskStatus,
@@ -331,6 +333,17 @@ export default function AnswerResult(props: Props) {
               }
             >
               <ChartAnswer {...props} />
+            </Tabs.TabPane>
+            <Tabs.TabPane
+              key="trace"
+              tab={
+                <div className="select-none">
+                  <ThunderboltOutlined className="mr-2" />
+                  <Text>Trace</Text>
+                </div>
+              }
+            >
+              <InlineTrace queryId={threadResponse?.askingTask?.queryId} />
             </Tabs.TabPane>
           </StyledTabs>
           <div className="mt-2 d-flex align-center">

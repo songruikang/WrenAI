@@ -74,6 +74,22 @@ export default function HeaderBar() {
               <StyledButton
                 shape="round"
                 size="small"
+                $isHighlight={pathname.startsWith(Path.QuerySQL)}
+                onClick={() => router.push(Path.QuerySQL)}
+              >
+                SQL
+              </StyledButton>
+              <StyledButton
+                shape="round"
+                size="small"
+                $isHighlight={pathname.startsWith(Path.Logs)}
+                onClick={() => router.push(Path.Logs)}
+              >
+                Logs
+              </StyledButton>
+              <StyledButton
+                shape="round"
+                size="small"
                 $isHighlight={pathname.startsWith(Path.APIManagement)}
                 onClick={() => router.push(Path.APIManagementHistory)}
               >

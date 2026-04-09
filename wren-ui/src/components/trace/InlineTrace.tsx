@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Empty, Spin, Tag, Space, Typography, Tooltip } from 'antd';
 import styled from 'styled-components';
 import TraceDetail from '@/components/trace/TraceDetail';
-import type { TraceGroup, TraceStep } from '@/pages/logs';
+import type { TraceGroup } from '@/pages/logs';
 
 const { Text } = Typography;
 
@@ -52,7 +52,12 @@ export default function InlineTrace({ queryId }: Props) {
   }, [fetchTrace]);
 
   if (!queryId) {
-    return <Empty description="No query ID available" image={Empty.PRESENTED_IMAGE_SIMPLE} />;
+    return (
+      <Empty
+        description="No query ID available"
+        image={Empty.PRESENTED_IMAGE_SIMPLE}
+      />
+    );
   }
 
   if (loading && !trace) {
@@ -60,10 +65,18 @@ export default function InlineTrace({ queryId }: Props) {
   }
 
   if (!trace || trace.steps.length === 0) {
-    return <Empty description="No LLM calls recorded for this query" image={Empty.PRESENTED_IMAGE_SIMPLE} />;
+    return (
+      <Empty
+        description="No LLM calls recorded for this query"
+        image={Empty.PRESENTED_IMAGE_SIMPLE}
+      />
+    );
   }
 
-  const totalDuration = trace.steps.reduce((sum, s) => sum + (s.duration_ms || 0), 0);
+  const totalDuration = trace.steps.reduce(
+    (sum, s) => sum + (s.duration_ms || 0),
+    0,
+  );
 
   return (
     <div>

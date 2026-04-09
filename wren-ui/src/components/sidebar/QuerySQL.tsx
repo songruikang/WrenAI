@@ -26,7 +26,7 @@ export default function QuerySQL() {
 
   return (
     <Layout>
-      <SidebarMenu items={menuItems} selectedKeys={MENU_KEY.SQL_QUERY} />
+      <SidebarMenu items={menuItems} selectedKeys={[MENU_KEY.SQL_QUERY]} />
     </Layout>
   );
 }

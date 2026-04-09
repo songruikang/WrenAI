@@ -1,7 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import axios from 'axios';
 
-const AI_SERVICE_URL = process.env.WREN_AI_ENDPOINT || 'http://wren-ai-service:5555';
+const AI_SERVICE_URL =
+  process.env.WREN_AI_ENDPOINT || 'http://wren-ai-service:5555';
 
 export default async function handler(
   req: NextApiRequest,

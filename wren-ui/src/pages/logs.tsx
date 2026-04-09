@@ -90,9 +90,7 @@ type ViewMode = 'by_question' | 'by_pipeline';
 type StatusFilter = 'all' | 'success' | 'error';
 
 // Derive status for a trace group
-function getTraceStatus(
-  trace: TraceGroup,
-): 'success' | 'error' | 'running' {
+function getTraceStatus(trace: TraceGroup): 'success' | 'error' | 'running' {
   const hasError = trace.steps.some((s) => s.type === 'llm_error');
   if (hasError) return 'error';
   return 'success';
@@ -101,13 +99,9 @@ function getTraceStatus(
 function StatusIcon({ status }: { status: 'success' | 'error' | 'running' }) {
   switch (status) {
     case 'success':
-      return (
-        <CheckCircleOutlined style={{ color: '#52c41a', fontSize: 14 }} />
-      );
+      return <CheckCircleOutlined style={{ color: '#52c41a', fontSize: 14 }} />;
     case 'error':
-      return (
-        <CloseCircleOutlined style={{ color: '#ff4d4f', fontSize: 14 }} />
-      );
+      return <CloseCircleOutlined style={{ color: '#ff4d4f', fontSize: 14 }} />;
     case 'running':
       return <LoadingOutlined style={{ color: '#1890ff', fontSize: 14 }} />;
   }
@@ -129,7 +123,11 @@ function groupByPipeline(
   traces: TraceGroup[],
   pipelineFilter: string | null,
   statusFilter: StatusFilter,
-): { pipeline: string; steps: (TraceStep & { question?: string })[]; totalTokens: number }[] {
+): {
+  pipeline: string;
+  steps: (TraceStep & { question?: string })[];
+  totalTokens: number;
+}[] {
   const map: Record<string, (TraceStep & { question?: string })[]> = {};
   traces.forEach((t) => {
     t.steps.forEach((s) => {
@@ -229,7 +227,9 @@ export default function LogsPage() {
   // Stats
   const stats = useMemo(() => {
     const total = traces.length;
-    const success = traces.filter((t) => getTraceStatus(t) === 'success').length;
+    const success = traces.filter(
+      (t) => getTraceStatus(t) === 'success',
+    ).length;
     const error = traces.filter((t) => getTraceStatus(t) === 'error').length;
     const totalTokens = traces.reduce(
       (sum, t) => sum + t.total_tokens.total,
@@ -249,9 +249,7 @@ export default function LogsPage() {
             <Space size={4}>
               <Tag>{stats.total} queries</Tag>
               <Tag color="green">{stats.success} ok</Tag>
-              {stats.error > 0 && (
-                <Tag color="red">{stats.error} err</Tag>
-              )}
+              {stats.error > 0 && <Tag color="red">{stats.error} err</Tag>}
               <TokenBadge color="orange">
                 {stats.totalTokens.toLocaleString()} tokens
               </TokenBadge>
@@ -328,11 +326,7 @@ export default function LogsPage() {
                         <TraceHeader>
                           <Space size={8}>
                             <StatusIcon status={status} />
-                            <Text
-                              strong
-                              style={{ maxWidth: 450 }}
-                              ellipsis
-                            >
+                            <Text strong style={{ maxWidth: 450 }} ellipsis>
                               {trace.question || trace.query_id}
                             </Text>
                             <Tag>{trace.steps.length} steps</Tag>
@@ -340,8 +334,7 @@ export default function LogsPage() {
                           <Space size={4}>
                             <Tooltip title="Prompt tokens">
                               <TokenBadge color="blue">
-                                P:{' '}
-                                {trace.total_tokens.prompt.toLocaleString()}
+                                P: {trace.total_tokens.prompt.toLocaleString()}
                               </TokenBadge>
                             </Tooltip>
                             <Tooltip title="Completion tokens">
@@ -352,8 +345,7 @@ export default function LogsPage() {
                             </Tooltip>
                             <Tooltip title="Total tokens">
                               <TokenBadge color="orange">
-                                T:{' '}
-                                {trace.total_tokens.total.toLocaleString()}
+                                T: {trace.total_tokens.total.toLocaleString()}
                               </TokenBadge>
                             </Tooltip>
                           </Space>
@@ -366,59 +358,50 @@ export default function LogsPage() {
                 })}
               </Collapse>
             )
+          ) : // === By Pipeline View ===
+          pipelineGroups.length === 0 ? (
+            <Empty description="No matching traces" />
           ) : (
-            // === By Pipeline View ===
-            pipelineGroups.length === 0 ? (
-              <Empty description="No matching traces" />
-            ) : (
-              <Collapse accordion>
-                {pipelineGroups.map((group) => {
-                  const successCount = group.steps.filter(
-                    (s) => s.type !== 'llm_error',
-                  ).length;
-                  const errorCount = group.steps.filter(
-                    (s) => s.type === 'llm_error',
-                  ).length;
-                  return (
-                    <Collapse.Panel
-                      key={group.pipeline}
-                      header={
-                        <TraceHeader>
-                          <Space size={8}>
-                            <Text strong>
-                              {PIPELINE_LABELS[group.pipeline] ||
-                                group.pipeline}
-                            </Text>
-                            <Tag>{group.steps.length} calls</Tag>
-                            {successCount > 0 && (
-                              <Tag
-                                color="green"
-                                icon={<CheckCircleOutlined />}
-                              >
-                                {successCount}
-                              </Tag>
-                            )}
-                            {errorCount > 0 && (
-                              <Tag
-                                color="red"
-                                icon={<CloseCircleOutlined />}
-                              >
-                                {errorCount}
-                              </Tag>
-                            )}
-                          </Space>
-                          <TokenBadge color="orange">
-                            {group.totalTokens.toLocaleString()} tokens
-                          </TokenBadge>
-                        </TraceHeader>
-                      }
-                    >
-                      <TraceDetail steps={group.steps} />
-                    </Collapse.Panel>
-                  );
-                })}
-              </Collapse>
-            )
+            <Collapse accordion>
+              {pipelineGroups.map((group) => {
+                const successCount = group.steps.filter(
+                  (s) => s.type !== 'llm_error',
+                ).length;
+                const errorCount = group.steps.filter(
+                  (s) => s.type === 'llm_error',
+                ).length;
+                return (
+                  <Collapse.Panel
+                    key={group.pipeline}
+                    header={
+                      <TraceHeader>
+                        <Space size={8}>
+                          <Text strong>
+                            {PIPELINE_LABELS[group.pipeline] || group.pipeline}
+                          </Text>
+                          <Tag>{group.steps.length} calls</Tag>
+                          {successCount > 0 && (
+                            <Tag color="green" icon={<CheckCircleOutlined />}>
+                              {successCount}
+                            </Tag>
+                          )}
+                          {errorCount > 0 && (
+                            <Tag color="red" icon={<CloseCircleOutlined />}>
+                              {errorCount}
+                            </Tag>
+                          )}
+                        </Space>
+                        <TokenBadge color="orange">
+                          {group.totalTokens.toLocaleString()} tokens
+                        </TokenBadge>
+                      </TraceHeader>
+                    }
+                  >
+                    <TraceDetail steps={group.steps} />
+                  </Collapse.Panel>
+                );
+              })}
+            </Collapse>
           )}
         </TraceList>
       </Container>

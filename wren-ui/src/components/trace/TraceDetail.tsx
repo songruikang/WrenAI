@@ -4,7 +4,7 @@ import CloseCircleOutlined from '@ant-design/icons/CloseCircleOutlined';
 import styled from 'styled-components';
 import type { TraceStep } from '@/pages/logs';
 
-const { Text, Paragraph } = Typography;
+const { Text } = Typography;
 
 const StepHeader = styled.div`
   display: flex;
@@ -92,13 +92,17 @@ interface Props {
 
 export default function TraceDetail({ steps }: Props) {
   return (
-    <Collapse size="small">
+    <Collapse>
       {steps.map((step, idx) => {
         const pipelineName = step.pipeline || 'unknown';
         const label = PIPELINE_LABELS[pipelineName] || pipelineName;
         const color = PIPELINE_COLORS[pipelineName] || 'default';
         const isError = step.type === 'llm_error';
-        const tokens = step.tokens || { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 };
+        const tokens = step.tokens || {
+          prompt_tokens: 0,
+          completion_tokens: 0,
+          total_tokens: 0,
+        };
 
         return (
           <Collapse.Panel
@@ -107,9 +111,13 @@ export default function TraceDetail({ steps }: Props) {
               <StepHeader>
                 <Space size={8}>
                   {isError ? (
-                    <CloseCircleOutlined style={{ color: '#ff4d4f', fontSize: 13 }} />
+                    <CloseCircleOutlined
+                      style={{ color: '#ff4d4f', fontSize: 13 }}
+                    />
                   ) : (
-                    <CheckCircleOutlined style={{ color: '#52c41a', fontSize: 13 }} />
+                    <CheckCircleOutlined
+                      style={{ color: '#52c41a', fontSize: 13 }}
+                    />
                   )}
                   <Tag color={isError ? 'red' : color}>{label}</Tag>
                   <Text type="secondary" style={{ fontSize: 12 }}>
@@ -121,7 +129,11 @@ export default function TraceDetail({ steps }: Props) {
                     </Text>
                   )}
                   {(step as any).question && (
-                    <Text type="secondary" style={{ fontSize: 11, maxWidth: 200 }} ellipsis>
+                    <Text
+                      type="secondary"
+                      style={{ fontSize: 11, maxWidth: 200 }}
+                      ellipsis
+                    >
                       {(step as any).question}
                     </Text>
                   )}
@@ -129,14 +141,18 @@ export default function TraceDetail({ steps }: Props) {
                 <Space size={4}>
                   {tokens.prompt_tokens > 0 && (
                     <Tooltip title="Prompt tokens">
-                      <Tag style={{ fontSize: 11, fontFamily: 'Menlo, monospace' }}>
+                      <Tag
+                        style={{ fontSize: 11, fontFamily: 'Menlo, monospace' }}
+                      >
                         P:{tokens.prompt_tokens.toLocaleString()}
                       </Tag>
                     </Tooltip>
                   )}
                   {tokens.completion_tokens > 0 && (
                     <Tooltip title="Completion tokens">
-                      <Tag style={{ fontSize: 11, fontFamily: 'Menlo, monospace' }}>
+                      <Tag
+                        style={{ fontSize: 11, fontFamily: 'Menlo, monospace' }}
+                      >
                         C:{tokens.completion_tokens.toLocaleString()}
                       </Tag>
                     </Tooltip>

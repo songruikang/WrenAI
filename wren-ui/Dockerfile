@@ -36,7 +36,7 @@ COPY .prettierrc ./
 COPY next.config.js ./
 COPY tsconfig.json ./
 
-RUN yarn build
+RUN NODE_OPTIONS=--max-old-space-size=4096 yarn build
 
 # Production image, copy all the files and run next
 FROM base AS runner

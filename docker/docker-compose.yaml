@@ -22,11 +22,13 @@ services:
     image: ghcr.io/canner/wren-engine:${WREN_ENGINE_VERSION}
     restart: on-failure
     platform: ${PLATFORM}
+    # [自定义] 资源限制 — 原版无限制，Mac 上 6 个容器同时跑会吃满内存
     deploy:
       resources:
         limits:
           cpus: '1.0'
           memory: 1G
+    # [自定义] 只 expose 不 ports — engine 仅供内部服务调用，无需映射到宿主机
     expose:
       - ${WREN_ENGINE_PORT}
       - ${WREN_ENGINE_SQL_PORT}
@@ -42,11 +44,13 @@ services:
     image: ghcr.io/canner/wren-engine-ibis:${IBIS_SERVER_VERSION}
     restart: on-failure
     platform: ${PLATFORM}
+    # [自定义] 资源限制 — ibis 负载低，512M 足够
     deploy:
       resources:
         limits:
           cpus: '0.5'
           memory: 512M
+    # [自定义] 只 expose 不 ports — 仅供内部服务调用
     expose:
       - ${IBIS_SERVER_PORT}
     environment:
@@ -60,6 +64,7 @@ services:
     image: ghcr.io/canner/wren-ai-service:${WREN_AI_SERVICE_VERSION}
     restart: on-failure
     platform: ${PLATFORM}
+    # [自定义] 资源限制 — AI service 需要较多内存处理 embedding
     deploy:
       resources:
         limits:
@@ -87,6 +92,7 @@ services:
   qdrant:
     image: qdrant/qdrant:v1.11.0
     restart: on-failure
+    # [自定义] 资源限制 — 14 表向量索引数据量小，512M 足够
     deploy:
       resources:
         limits:
@@ -101,9 +107,12 @@ services:
       - wren
 
   wren-ui:
+    # [自定义] 使用本地构建镜像 — 包含 Trace 日志页面等 UI 二次开发改动
+    # 构建方式: cd WrenAI/wren-ui && docker build -t wren-ui-custom:latest .
     image: wren-ui-custom:latest
     restart: on-failure
     platform: ${PLATFORM}
+    # [自定义] 资源限制
     deploy:
       resources:
         limits:

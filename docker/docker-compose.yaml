@@ -61,7 +61,12 @@ services:
       - wren
 
   wren-ai-service:
-    image: ghcr.io/canner/wren-ai-service:${WREN_AI_SERVICE_VERSION}
+    # [自定义] 本地 build — 二次开发 AI service pipeline
+    # 构建: cd WrenAI/wren-ai-service && docker build -t wrenai-wren-ai-service:latest -f docker/Dockerfile .
+    image: wrenai-wren-ai-service:latest
+    build:
+      context: ../wren-ai-service
+      dockerfile: docker/Dockerfile
     restart: on-failure
     platform: ${PLATFORM}
     # [自定义] 资源限制 — AI service 需要较多内存处理 embedding
@@ -93,7 +98,8 @@ services:
       - qdrant
 
   qdrant:
-    image: qdrant/qdrant:v1.11.0
+    # v1.17.0 兼容本地 build 的 ai-service 中 qdrant-client 版本
+    image: qdrant/qdrant:v1.17.0
     restart: on-failure
     # [自定义] 资源限制 — 14 表向量索引数据量小，512M 足够
     deploy:
@@ -110,9 +116,11 @@ services:
       - wren
 
   wren-ui:
-    # [自定义] 使用本地构建镜像 — 包含 Trace 日志页面等 UI 二次开发改动
-    # 构建方式: cd WrenAI/wren-ui && docker build -t wren-ui-custom:latest .
+    # [自定义] 本地 build — 包含 Trace 日志页面等 UI 二次开发改动
     image: wren-ui-custom:latest
+    build:
+      context: ../wren-ui
+      dockerfile: Dockerfile
     restart: on-failure
     platform: ${PLATFORM}
     # [自定义] 资源限制

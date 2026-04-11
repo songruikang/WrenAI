@@ -19,7 +19,11 @@ interface TraceEvent {
   question?: string;
   model?: string;
   duration_ms?: number;
-  tokens?: { prompt_tokens: number; completion_tokens: number; total_tokens: number };
+  tokens?: {
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
+  };
   system_prompt?: string;
   user_prompt?: string;
   response?: string;

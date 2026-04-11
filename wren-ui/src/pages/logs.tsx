@@ -186,7 +186,19 @@ export default function LogsPage() {
     try {
       const res = await fetch('/api/traces?tail=500');
       const data = await res.json();
-      setTraces((data.traces || []).reverse());
+      // API 返回的 trace 没有 total_tokens，需要从 steps 计算
+      const enriched = (data.traces || []).map((t: any) => ({
+        ...t,
+        total_tokens: (t.steps || []).reduce(
+          (acc: any, s: any) => ({
+            prompt: acc.prompt + (s.tokens?.prompt_tokens || 0),
+            completion: acc.completion + (s.tokens?.completion_tokens || 0),
+            total: acc.total + (s.tokens?.total_tokens || 0),
+          }),
+          { prompt: 0, completion: 0, total: 0 },
+        ),
+      }));
+      setTraces(enriched.reverse());
     } catch (e) {
       console.error('Failed to fetch traces:', e);
     }

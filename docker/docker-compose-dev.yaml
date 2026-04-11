@@ -1,4 +1,30 @@
-version: "3"
+# WrenAI 开发环境 Docker Compose（公司云主机）
+#
+# 与 docker-compose.yaml (Mac) 的区别：
+#   - wren-ai-service: 本地 build
+#   - wren-ui: 本地 build，使用 Dockerfile.cloud（代理+宿主机node_modules）
+#   - build 使用 network: host 走宿主机代理
+#   - qdrant v1.17.0（匹配 qdrant-client 1.12.1）
+#
+# 构建命令（不用 compose build，用独立 docker build 避免 BuildKit 问题）：
+#   socat TCP-LISTEN:3128,bind=172.17.0.1,fork,reuseaddr TCP:127.0.0.1:3128 &
+#
+#   cd ../wren-ui
+#   DOCKER_BUILDKIT=0 docker build \
+#     --build-arg HTTP_PROXY=http://172.17.0.1:3128 \
+#     --build-arg HTTPS_PROXY=http://172.17.0.1:3128 \
+#     -t wrenai-wren-ui:latest -f Dockerfile.cloud .
+#
+#   cd ../wren-ai-service
+#   DOCKER_BUILDKIT=0 docker build \
+#     --build-arg HTTP_PROXY=http://172.17.0.1:3128 \
+#     --build-arg HTTPS_PROXY=http://172.17.0.1:3128 \
+#     -t wrenai-wren-ai-service:latest -f docker/Dockerfile.cloud .
+#
+#   pkill -f "socat.*3128"
+#
+# 启动命令：
+#   cd docker && docker compose -f docker-compose-dev.yaml up -d
 
 volumes:
   data:
@@ -10,7 +36,7 @@ networks:
 services:
   bootstrap:
     image: ghcr.io/canner/wren-bootstrap:${WREN_BOOTSTRAP_VERSION}
-    pull_policy: always
+    restart: on-failure
     platform: ${PLATFORM}
     environment:
       DATA_PATH: /app/data
@@ -20,76 +46,112 @@ services:
 
   wren-engine:
     image: ghcr.io/canner/wren-engine:${WREN_ENGINE_VERSION}
-    pull_policy: always
+    restart: on-failure
     platform: ${PLATFORM}
     expose:
+      - ${WREN_ENGINE_PORT}
       - ${WREN_ENGINE_SQL_PORT}
-    ports:
-      - ${WREN_ENGINE_PORT}:${WREN_ENGINE_PORT}
     volumes:
       - data:/usr/src/app/etc
+      - ${PROJECT_DIR}/data:/usr/src/app/data
     networks:
       - wren
     depends_on:
       - bootstrap
 
-  wren-ai-service:
-    image: ghcr.io/canner/wren-ai-service:${WREN_AI_SERVICE_VERSION}
-    pull_policy: always
+  ibis-server:
+    image: ghcr.io/canner/wren-engine-ibis:${IBIS_SERVER_VERSION}
+    restart: on-failure
     platform: ${PLATFORM}
+    expose:
+      - ${IBIS_SERVER_PORT}
+    environment:
+      WREN_ENGINE_ENDPOINT: http://wren-engine:${WREN_ENGINE_PORT}
+    volumes:
+      - ${LOCAL_STORAGE:-.}:/usr/src/app/data
+    networks:
+      - wren
+
+  wren-ai-service:
+    # [dev] 本地 build — 公司环境建议用独立 docker build（见文件头注释）
+    image: wrenai-wren-ai-service:latest
+    build:
+      context: ../wren-ai-service
+      dockerfile: docker/Dockerfile.cloud
+      network: host
+    restart: on-failure
+    platform: ${PLATFORM}
+    expose:
+      - ${WREN_AI_SERVICE_PORT}
     ports:
       - ${AI_SERVICE_FORWARD_PORT}:${WREN_AI_SERVICE_PORT}
     environment:
-      WREN_UI_ENDPOINT: http://host.docker.internal:${WREN_UI_PORT}
-      # sometimes the console won't show print messages,
-      # using PYTHONUNBUFFERED: 1 can fix this
       PYTHONUNBUFFERED: 1
       CONFIG_PATH: /app/config.yaml
     env_file:
       - ${PROJECT_DIR}/.env
     volumes:
       - ${PROJECT_DIR}/config.yaml:/app/config.yaml:ro
-      - ${PROJECT_DIR}/data:/app/data:ro
+      - ${PROJECT_DIR}/data:/app/data
+      # [自定义] LLM 追踪回调 — sitecustomize.py 方式注入
+      - ${PROJECT_DIR}/trace_callback.py:/app/.venv/lib/python3.12/site-packages/sitecustomize.py:ro
     networks:
       - wren
     depends_on:
       - qdrant
 
-  ibis-server:
-    image: ghcr.io/canner/wren-engine-ibis:${IBIS_SERVER_VERSION}
-    pull_policy: always
-    platform: ${PLATFORM}
-    expose:
-      - 8000
-    ports:
-      - ${IBIS_SERVER_PORT}:8000
-    environment:
-      WREN_ENGINE_ENDPOINT: http://wren-engine:${WREN_ENGINE_PORT}
-      LOG_LEVEL: DEBUG
-    networks:
-      - wren
-
   qdrant:
-    image: qdrant/qdrant:v1.11.0
-    pull_policy: always
-    ports:
-      - 6333:6333
-      - 6334:6334
+    # 公司环境 v1.17.0（匹配 qdrant-client 1.12.1）
+    image: qdrant/qdrant:v1.17.0
+    restart: on-failure
+    expose:
+      - 6333
+      - 6334
+    volumes:
+      - data:/qdrant/storage
     networks:
       - wren
 
-  # If you want to use postgres for testing purpose, uncomment the following block
-  # postgres:
-  #   image: postgres:14-alpine
-  #   platform: ${PLATFORM}
-  #   ports:
-  #     - 9432:5432
-  #   volumes:
-  #     - data:/var/lib/postgresql/data
-  #   environment:
-  #     - POSTGRES_PASSWORD=secret
-  #     - POSTGRES_USER=test
-  #     - POSTGRES_DB=test
-  #     - PGDATA=/var/lib/postgresql/data/pgdata
-  #   networks:
-  #     - wren
+  wren-ui:
+    # [dev] 本地 build — 使用 Dockerfile.cloud（代理环境专用）
+    image: wrenai-wren-ui:latest
+    build:
+      context: ../wren-ui
+      dockerfile: Dockerfile.cloud
+      network: host
+    restart: on-failure
+    platform: ${PLATFORM}
+    environment:
+      DB_TYPE: sqlite
+      SQLITE_FILE: /app/data/db.sqlite3
+      WREN_ENGINE_ENDPOINT: http://wren-engine:${WREN_ENGINE_PORT}
+      WREN_AI_ENDPOINT: http://wren-ai-service:${WREN_AI_SERVICE_PORT}
+      IBIS_SERVER_ENDPOINT: http://ibis-server:${IBIS_SERVER_PORT}
+      GENERATION_MODEL: ${GENERATION_MODEL}
+      WREN_ENGINE_PORT: ${WREN_ENGINE_PORT}
+      WREN_AI_SERVICE_VERSION: ${WREN_AI_SERVICE_VERSION}
+      WREN_UI_VERSION: ${WREN_UI_VERSION}
+      WREN_ENGINE_VERSION: ${WREN_ENGINE_VERSION}
+      WREN_PRODUCT_VERSION: ${WREN_PRODUCT_VERSION}
+      USER_UUID: ${USER_UUID}
+      POSTHOG_API_KEY: ${POSTHOG_API_KEY}
+      POSTHOG_HOST: ${POSTHOG_HOST}
+      TELEMETRY_ENABLED: ${TELEMETRY_ENABLED}
+      NEXT_PUBLIC_USER_UUID: ${USER_UUID}
+      NEXT_PUBLIC_POSTHOG_API_KEY: ${POSTHOG_API_KEY}
+      NEXT_PUBLIC_POSTHOG_HOST: ${POSTHOG_HOST}
+      NEXT_PUBLIC_TELEMETRY_ENABLED: ${TELEMETRY_ENABLED}
+      EXPERIMENTAL_ENGINE_RUST_VERSION: ${EXPERIMENTAL_ENGINE_RUST_VERSION}
+      # [自定义] 推荐问题开关
+      ENABLE_RECOMMENDATION_QUESTIONS: ${ENABLE_RECOMMENDATION_QUESTIONS:-true}
+    ports:
+      - ${HOST_PORT}:3000
+    volumes:
+      - data:/app/data
+      # [自定义] 挂载宿主机 data/ 到 /app/llm_data，用于读取 LLM 追踪日志
+      - ${PROJECT_DIR}/data:/app/llm_data:ro
+    networks:
+      - wren
+    depends_on:
+      - wren-ai-service
+      - wren-engine

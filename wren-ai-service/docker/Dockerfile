@@ -13,6 +13,9 @@ WORKDIR /app
 COPY pyproject.toml ./
 
 RUN poetry install --without dev,eval,test --no-root && rm -rf $POETRY_CACHE_DIR
+# [自定义] 降级 qdrant-client 解决与 haystack qdrant store 的兼容问题
+# 新版 client 传 init_from 参数导致 AssertionError
+RUN /app/.venv/bin/pip install qdrant-client==1.12.1
 
 FROM python:3.12.0-slim-bookworm as runtime
 

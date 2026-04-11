@@ -330,6 +330,11 @@ def prompt(
 async def filter_columns_in_tables(
     prompt: dict, table_columns_selection_generator: Any, generator_name: str
 ) -> dict:
+    try:
+        from sitecustomize import set_trace_context
+        set_trace_context(pipeline_name='column_pruning')
+    except ImportError:
+        pass
     if prompt:
         return await table_columns_selection_generator(
             prompt=prompt.get("prompt")

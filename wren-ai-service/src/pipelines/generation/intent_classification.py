@@ -293,6 +293,11 @@ def prompt(
 @observe(as_type="generation", capture_input=False)
 @trace_cost
 async def classify_intent(prompt: dict, generator: Any, generator_name: str) -> dict:
+    try:
+        from sitecustomize import set_trace_context
+        set_trace_context(pipeline_name='intent_classification')
+    except ImportError:
+        pass
     return await generator(prompt=prompt.get("prompt")), generator_name
 
 

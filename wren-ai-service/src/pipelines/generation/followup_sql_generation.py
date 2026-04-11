@@ -132,13 +132,20 @@ async def generate_sql_in_followup(
     histories: list[AskHistory],
     generator_name: str,
     sql_knowledge: SqlKnowledge | None = None,
+    query_id: str | None = None,
 ) -> dict:
+    try:
+        from sitecustomize import set_trace_context
+        set_trace_context(pipeline_name='followup_sql_generation')
+    except ImportError:
+        pass
     history_messages = construct_ask_history_messages(histories)
     current_system_prompt = get_sql_generation_system_prompt(sql_knowledge)
     return await generator(
         prompt=prompt.get("prompt"),
         history_messages=history_messages,
         current_system_prompt=current_system_prompt,
+        query_id=query_id,
     ), generator_name
 
 
@@ -208,6 +215,7 @@ class FollowUpSQLGeneration(BasicPipeline):
         use_dry_plan: bool = False,
         allow_dry_plan_fallback: bool = True,
         sql_knowledge: SqlKnowledge | None = None,
+        query_id: str | None = None,
     ):
         logger.info("Follow-Up SQL Generation pipeline is running...")
 
@@ -234,6 +242,7 @@ class FollowUpSQLGeneration(BasicPipeline):
                 "allow_dry_plan_fallback": allow_dry_plan_fallback,
                 "data_source": metadata.get("data_source", "local_file"),
                 "sql_knowledge": sql_knowledge,
+                "query_id": query_id,
                 **self._components,
             },
         )

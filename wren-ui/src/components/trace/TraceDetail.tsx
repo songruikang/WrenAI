@@ -14,9 +14,9 @@ const StepHeader = styled.div`
 `;
 
 const PromptBlock = styled.div`
-  background: #f5f5f5;
-  border: 1px solid #e8e8e8;
-  border-radius: 4px;
+  background: #f6f8fa;
+  border: 1px solid #e1e4e8;
+  border-radius: 6px;
   padding: 12px;
   margin: 8px 0;
   font-family: 'Menlo', monospace;
@@ -46,42 +46,25 @@ const Label = styled(Text)`
   font-weight: 600;
 `;
 
-const PIPELINE_LABELS: Record<string, string> = {
-  // 粗粒度（ask.py 编排层）
-  ask_start: '开始',
-  historical_question_retrieval: '历史问题检索（embedding）',
-  intent_classification: '意图分类（LLM）',
-  db_schema_retrieval_and_column_pruning: '表列检索 + 列裁剪',
-  sql_generation_reasoning: 'SQL生成推理（LLM）',
+const STEP_LABELS: Record<string, string> = {
+  schema_retrieval: '模式检索',
+  column_pruning: '列裁剪',
   sql_generation: 'SQL生成',
+  sql_dryrun: '语法校验',
   sql_correction: 'SQL纠错',
-  question_recommendation: '推荐问题生成（LLM）',
-  sql_pairs_retrieval: 'SQL样例检索（embedding）',
-  instructions_retrieval: '指令检索（embedding）',
-  sql_functions_retrieval: 'SQL函数检索',
-  followup_sql_generation: '追问SQL生成',
-  chart_generation: '图表生成（LLM）',
-  data_assistance: '数据助手（LLM）',
-  misleading_assistance: '无关问题处理（LLM）',
-  sql_answer: 'SQL结果解读（LLM）',
-  preprocess_sql_data: 'SQL数据预处理（LLM）',
-  // 细粒度（pipeline 内部）
-  schema_embedding: '表结构向量检索（embedding）',
-  column_pruning: '列裁剪（LLM）',
-  sql_generation_llm: 'SQL生成（LLM）',
-  sql_correction_llm: 'SQL纠错（LLM）',
-};
-
-const PIPELINE_COLORS: Record<string, string> = {
-  db_schema_retrieval_and_column_pruning: 'purple',
-  sql_generation: 'blue',
-  sql_correction: 'orange',
-  intent_classification: 'cyan',
-  sql_generation_reasoning: 'geekblue',
-  question_recommendation: 'default',
+  sql_execution: 'SQL执行',
+  intent_classification: '意图分类',
+  question_recommendation: '推荐问题',
+  semantics_description: '语义描述',
+  relationship_recommendation: '关系推荐',
+  llm_call: 'LLM调用',
+  sql_answer: 'SQL解读',
+  data_assistance: '数据助手',
+  misleading_assistance: '非SQL处理',
 };
 
 function formatDuration(ms: number): string {
+  if (!ms || ms <= 0) return '';
   if (ms < 1000) return `${ms}ms`;
   return `${(ms / 1000).toFixed(1)}s`;
 }
@@ -94,15 +77,14 @@ export default function TraceDetail({ steps }: Props) {
   return (
     <Collapse>
       {steps.map((step, idx) => {
-        const pipelineName = step.pipeline || 'unknown';
-        const label = PIPELINE_LABELS[pipelineName] || pipelineName;
-        const color = PIPELINE_COLORS[pipelineName] || 'default';
-        const isError = step.type === 'llm_error';
-        const tokens = step.tokens || {
-          prompt_tokens: 0,
-          completion_tokens: 0,
-          total_tokens: 0,
-        };
+        const stepType = step.step_type || 'unknown';
+        const label = STEP_LABELS[stepType] || stepType;
+        const isError =
+          step.status === 'error' ||
+          step.status?.startsWith('error_') ||
+          step.error;
+        const promptTokens = step.prompt_tokens || 0;
+        const completionTokens = step.completion_tokens || 0;
 
         return (
           <Collapse.Panel
@@ -119,7 +101,7 @@ export default function TraceDetail({ steps }: Props) {
                       style={{ color: '#52c41a', fontSize: 13 }}
                     />
                   )}
-                  <Tag color={isError ? 'red' : color}>{label}</Tag>
+                  <Tag color={isError ? 'red' : 'blue'}>{label}</Tag>
                   <Text type="secondary" style={{ fontSize: 12 }}>
                     {step.model}
                   </Text>
@@ -128,32 +110,23 @@ export default function TraceDetail({ steps }: Props) {
                       {formatDuration(step.duration_ms)}
                     </Text>
                   )}
-                  {(step as any).question && (
-                    <Text
-                      type="secondary"
-                      style={{ fontSize: 11, maxWidth: 200 }}
-                      ellipsis
-                    >
-                      {(step as any).question}
-                    </Text>
-                  )}
                 </Space>
                 <Space size={4}>
-                  {tokens.prompt_tokens > 0 && (
+                  {promptTokens > 0 && (
                     <Tooltip title="Prompt tokens">
                       <Tag
                         style={{ fontSize: 11, fontFamily: 'Menlo, monospace' }}
                       >
-                        P:{tokens.prompt_tokens.toLocaleString()}
+                        Prompt:{promptTokens.toLocaleString()}
                       </Tag>
                     </Tooltip>
                   )}
-                  {tokens.completion_tokens > 0 && (
+                  {completionTokens > 0 && (
                     <Tooltip title="Completion tokens">
                       <Tag
                         style={{ fontSize: 11, fontFamily: 'Menlo, monospace' }}
                       >
-                        C:{tokens.completion_tokens.toLocaleString()}
+                        Completion:{completionTokens.toLocaleString()}
                       </Tag>
                     </Tooltip>
                   )}
@@ -161,16 +134,10 @@ export default function TraceDetail({ steps }: Props) {
               </StepHeader>
             }
           >
-            {step.system_prompt && (
+            {step.request && (
               <>
-                <Label type="secondary">SYSTEM PROMPT</Label>
-                <PromptBlock>{step.system_prompt}</PromptBlock>
-              </>
-            )}
-            {step.user_prompt && (
-              <>
-                <Label type="secondary">USER PROMPT</Label>
-                <PromptBlock>{step.user_prompt}</PromptBlock>
+                <Label type="secondary">REQUEST</Label>
+                <PromptBlock>{step.request}</PromptBlock>
               </>
             )}
             {step.response && (

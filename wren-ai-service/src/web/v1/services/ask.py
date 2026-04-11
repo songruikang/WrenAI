@@ -149,6 +149,14 @@ class AskService:
         }
 
         query_id = ask_request.query_id
+
+        # Set trace context for LLM call tracing
+        try:
+            from sitecustomize import set_trace_context
+            set_trace_context(query_id=ask_request.query_id, question=ask_request.query)
+        except ImportError:
+            pass
+
         histories = ask_request.histories[: self._max_histories][
             ::-1
         ]  # reverse the order of histories
@@ -477,6 +485,7 @@ class AskService:
                         use_dry_plan=use_dry_plan,
                         allow_dry_plan_fallback=allow_dry_plan_fallback,
                         sql_knowledge=sql_knowledge,
+                        query_id=query_id,
                     )
                 else:
                     text_to_sql_generation_results = await self._pipelines[
@@ -495,6 +504,7 @@ class AskService:
                         use_dry_plan=use_dry_plan,
                         allow_dry_plan_fallback=allow_dry_plan_fallback,
                         sql_knowledge=sql_knowledge,
+                        query_id=query_id,
                     )
 
                 if sql_valid_result := text_to_sql_generation_results["post_process"][
@@ -561,6 +571,7 @@ class AskService:
                             allow_dry_plan_fallback=allow_dry_plan_fallback,
                             sql_functions=sql_functions,
                             sql_knowledge=sql_knowledge,
+                            query_id=query_id,
                         )
 
                         if valid_generation_result := sql_correction_results[

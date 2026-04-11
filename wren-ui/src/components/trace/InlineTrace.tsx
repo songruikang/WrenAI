@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Empty, Spin, Tag, Space, Typography, Tooltip } from 'antd';
 import styled from 'styled-components';
 import TraceDetail from '@/components/trace/TraceDetail';
-import type { TraceGroup } from '@/pages/logs';
+import type { TraceQuery } from '@/pages/logs';
 
 const { Text } = Typography;
 
@@ -25,18 +25,20 @@ interface Props {
 }
 
 export default function InlineTrace({ queryId }: Props) {
-  const [trace, setTrace] = useState<TraceGroup | null>(null);
+  const [trace, setTrace] = useState<TraceQuery | null>(null);
   const [loading, setLoading] = useState(false);
 
   const fetchTrace = useCallback(async () => {
     if (!queryId) return;
     setLoading(true);
     try {
-      const res = await fetch(`/api/traces?query_id=${queryId}&tail=50`);
+      const res = await fetch(`/api/traces?page=1&size=50`);
       const data = await res.json();
-      if (data.traces && data.traces.length > 0) {
-        setTrace(data.traces[0]);
-      }
+      // 从返回的 queries 中找到匹配的 query_id
+      const match = (data.queries || []).find(
+        (q: TraceQuery) => q.query_id === queryId,
+      );
+      if (match) setTrace(match);
     } catch (e) {
       console.error('Failed to fetch trace:', e);
     } finally {
@@ -46,7 +48,6 @@ export default function InlineTrace({ queryId }: Props) {
 
   useEffect(() => {
     fetchTrace();
-    // Poll a few times in case data is still being written
     const timer = setTimeout(fetchTrace, 3000);
     return () => clearTimeout(timer);
   }, [fetchTrace]);
@@ -64,7 +65,7 @@ export default function InlineTrace({ queryId }: Props) {
     return <Spin size="small" />;
   }
 
-  if (!trace || trace.steps.length === 0) {
+  if (!trace || !trace.steps || trace.steps.length === 0) {
     return (
       <Empty
         description="No LLM calls recorded for this query"
@@ -73,10 +74,10 @@ export default function InlineTrace({ queryId }: Props) {
     );
   }
 
-  const totalDuration = trace.steps.reduce(
-    (sum, s) => sum + (s.duration_ms || 0),
-    0,
-  );
+  const totalDuration = trace.total_duration_ms || 0;
+  const promptTokens = trace.total_prompt_tokens || 0;
+  const completionTokens = trace.total_completion_tokens || 0;
+  const totalTokens = promptTokens + completionTokens;
 
   return (
     <div>
@@ -92,17 +93,17 @@ export default function InlineTrace({ queryId }: Props) {
         <Space size={4}>
           <Tooltip title="Prompt tokens">
             <TokenTag color="blue">
-              Prompt: {trace.total_tokens.prompt.toLocaleString()}
+              Prompt: {promptTokens.toLocaleString()}
             </TokenTag>
           </Tooltip>
           <Tooltip title="Completion tokens">
             <TokenTag color="green">
-              Completion: {trace.total_tokens.completion.toLocaleString()}
+              Completion: {completionTokens.toLocaleString()}
             </TokenTag>
           </Tooltip>
           <Tooltip title="Total tokens">
             <TokenTag color="orange">
-              Total: {trace.total_tokens.total.toLocaleString()}
+              Total: {totalTokens.toLocaleString()}
             </TokenTag>
           </Tooltip>
         </Space>

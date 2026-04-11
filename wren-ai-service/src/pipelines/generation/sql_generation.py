@@ -127,10 +127,18 @@ async def generate_sql(
     generator: Any,
     generator_name: str,
     sql_knowledge: SqlKnowledge | None = None,
+    query_id: str | None = None,
 ) -> dict:
+    try:
+        from sitecustomize import set_trace_context
+        set_trace_context(pipeline_name='sql_generation')
+    except ImportError:
+        pass
     current_system_prompt = get_sql_generation_system_prompt(sql_knowledge)
     return await generator(
-        prompt=prompt.get("prompt"), current_system_prompt=current_system_prompt
+        prompt=prompt.get("prompt"),
+        current_system_prompt=current_system_prompt,
+        query_id=query_id,
     ), generator_name
 
 
@@ -202,6 +210,7 @@ class SQLGeneration(BasicPipeline):
         allow_dry_plan_fallback: bool = True,
         allow_data_preview: bool = False,
         sql_knowledge: SqlKnowledge | None = None,
+        query_id: str | None = None,
     ):
         logger.info("SQL Generation pipeline is running...")
 
@@ -228,6 +237,7 @@ class SQLGeneration(BasicPipeline):
                 "data_source": metadata.get("data_source", "local_file"),
                 "allow_data_preview": allow_data_preview,
                 "sql_knowledge": sql_knowledge,
+                "query_id": query_id,
                 **self._components,
             },
         )

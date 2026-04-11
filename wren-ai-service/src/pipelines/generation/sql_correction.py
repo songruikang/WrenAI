@@ -108,10 +108,18 @@ async def generate_sql_correction(
     generator: Any,
     generator_name: str,
     sql_knowledge: SqlKnowledge | None = None,
+    query_id: str | None = None,
 ) -> dict:
+    try:
+        from sitecustomize import set_trace_context
+        set_trace_context(pipeline_name='sql_correction')
+    except ImportError:
+        pass
     current_system_prompt = get_sql_correction_system_prompt(sql_knowledge)
     return await generator(
-        prompt=prompt.get("prompt"), current_system_prompt=current_system_prompt
+        prompt=prompt.get("prompt"),
+        current_system_prompt=current_system_prompt,
+        query_id=query_id,
     ), generator_name
 
 
@@ -175,6 +183,7 @@ class SQLCorrection(BasicPipeline):
         use_dry_plan: bool = False,
         allow_dry_plan_fallback: bool = True,
         sql_knowledge: SqlKnowledge | None = None,
+        query_id: str | None = None,
     ):
         logger.info("SQLCorrection pipeline is running...")
 
@@ -195,6 +204,7 @@ class SQLCorrection(BasicPipeline):
                 "allow_dry_plan_fallback": allow_dry_plan_fallback,
                 "data_source": metadata.get("data_source", "local_file"),
                 "sql_knowledge": sql_knowledge,
+                "query_id": query_id,
                 **self._components,
             },
         )

@@ -13,28 +13,33 @@ wren-ui 的 /api/traces 接口读取该文件展示在 Logs 页面。
 import json
 import os
 import threading
+from contextvars import ContextVar
 from datetime import datetime, timezone
 
 # 输出路径 — docker-compose 中 data volume 挂载到 /app/data/
 TRACE_FILE = os.environ.get("LLM_TRACE_FILE", "/app/data/llm_traces.jsonl")
 _lock = threading.Lock()
-_current_context = threading.local()
+
+# 使用 contextvars 替代 threading.local()，支持 asyncio 上下文传播
+_ctx_query_id: ContextVar[str | None] = ContextVar("trace_query_id", default=None)
+_ctx_pipeline_name: ContextVar[str | None] = ContextVar("trace_pipeline_name", default=None)
+_ctx_question: ContextVar[str | None] = ContextVar("trace_question", default=None)
 
 
 def set_trace_context(query_id=None, pipeline_name=None, question=None):
     if query_id is not None:
-        _current_context.query_id = query_id
+        _ctx_query_id.set(query_id)
     if pipeline_name is not None:
-        _current_context.pipeline_name = pipeline_name
+        _ctx_pipeline_name.set(pipeline_name)
     if question is not None:
-        _current_context.question = question
+        _ctx_question.set(question)
 
 
 def get_trace_context():
     return {
-        "query_id": getattr(_current_context, "query_id", None),
-        "pipeline_name": getattr(_current_context, "pipeline_name", None),
-        "question": getattr(_current_context, "question", None),
+        "query_id": _ctx_query_id.get(),
+        "pipeline_name": _ctx_pipeline_name.get(),
+        "question": _ctx_question.get(),
     }
 
 
@@ -61,8 +66,8 @@ try:
     class WrenTraceLogger(CustomLogger):
         async def async_log_success_event(self, kwargs, response_obj, start_time, end_time):
             try:
-                messages = kwargs.get("messages", [])
                 model = kwargs.get("model", "unknown")
+                call_type = kwargs.get("call_type", "completion")
 
                 usage = {}
                 if hasattr(response_obj, "usage") and response_obj.usage:
@@ -73,26 +78,48 @@ try:
                     }
 
                 response_text = ""
-                if hasattr(response_obj, "choices") and response_obj.choices:
-                    choice = response_obj.choices[0]
-                    if hasattr(choice, "message") and hasattr(choice.message, "content"):
-                        response_text = choice.message.content or ""
-
                 system_prompt = ""
                 user_prompt = ""
-                for msg in messages:
-                    role = msg.get("role", "")
-                    content = msg.get("content", "")
-                    if isinstance(content, list):
-                        content = " ".join(
-                            p.get("text", "") for p in content if isinstance(p, dict)
-                        )
-                    if role == "system":
-                        system_prompt = content
-                    elif role == "user":
-                        user_prompt = content
+
+                if call_type == "aembedding" or call_type == "embedding":
+                    # Embedding 调用：input 是文本列表，响应是向量
+                    embed_input = kwargs.get("input", [])
+                    if isinstance(embed_input, list):
+                        user_prompt = f"[Embedding] {len(embed_input)} texts, first: {str(embed_input[0])[:200]}..." if embed_input else "[Embedding] empty"
+                    else:
+                        user_prompt = f"[Embedding] {str(embed_input)[:200]}"
+                    if hasattr(response_obj, "data"):
+                        response_text = f"Returned {len(response_obj.data)} embeddings"
+                    # Embedding 的 token 统计：prompt_tokens = 输入 token 数
+                    if not usage and hasattr(response_obj, "usage") and response_obj.usage:
+                        usage = {"prompt_tokens": getattr(response_obj.usage, "prompt_tokens", 0), "completion_tokens": 0, "total_tokens": getattr(response_obj.usage, "total_tokens", 0)}
+                else:
+                    # Completion 调用：messages 格式
+                    if hasattr(response_obj, "choices") and response_obj.choices:
+                        choice = response_obj.choices[0]
+                        if hasattr(choice, "message") and hasattr(choice.message, "content"):
+                            response_text = choice.message.content or ""
+
+                    messages = kwargs.get("messages", [])
+                    for msg in messages:
+                        role = msg.get("role", "")
+                        content = msg.get("content", "")
+                        if isinstance(content, list):
+                            content = " ".join(
+                                p.get("text", "") for p in content if isinstance(p, dict)
+                            )
+                        if role == "system":
+                            system_prompt = content
+                        elif role == "user":
+                            user_prompt = content
 
                 ctx = get_trace_context()
+                # 优先从 litellm metadata 读取（跨 asyncio context 不丢失）
+                meta = kwargs.get("litellm_params", {}).get("metadata", {}) or {}
+                qid = meta.get("trace_query_id") or ctx.get("query_id")
+                pipe = meta.get("trace_pipeline") or ctx.get("pipeline_name")
+                q = meta.get("trace_question") or ctx.get("question")
+
                 duration_ms = 0
                 if start_time and end_time:
                     duration_ms = int((end_time - start_time).total_seconds() * 1000)
@@ -100,15 +127,16 @@ try:
                 event = {
                     "type": "llm_call",
                     "timestamp": datetime.now(timezone.utc).isoformat(),
-                    "query_id": ctx.get("query_id"),
-                    "pipeline": ctx.get("pipeline_name"),
-                    "question": ctx.get("question"),
+                    "query_id": qid,
+                    "pipeline": pipe,
+                    "question": q,
+                    "source": "user" if qid else "system",
                     "model": model,
                     "duration_ms": duration_ms,
                     "tokens": usage,
-                    "system_prompt": _truncate(system_prompt, 3000),
-                    "user_prompt": _truncate(user_prompt, 3000),
-                    "response": _truncate(response_text, 3000),
+                    "system_prompt": system_prompt,
+                    "user_prompt": user_prompt,
+                    "response": response_text,
                 }
                 _write_event(event)
             except Exception as e:
@@ -117,6 +145,12 @@ try:
         async def async_log_failure_event(self, kwargs, response_obj, start_time, end_time):
             try:
                 ctx = get_trace_context()
+                # 优先从 litellm metadata 读取
+                meta = kwargs.get("litellm_params", {}).get("metadata", {}) or {}
+                qid = meta.get("trace_query_id") or ctx.get("query_id")
+                pipe = meta.get("trace_pipeline") or ctx.get("pipeline_name")
+                q = meta.get("trace_question") or ctx.get("question")
+
                 messages = kwargs.get("messages", [])
                 user_prompt = ""
                 for msg in messages:
@@ -135,13 +169,14 @@ try:
                 event = {
                     "type": "llm_error",
                     "timestamp": datetime.now(timezone.utc).isoformat(),
-                    "query_id": ctx.get("query_id"),
-                    "pipeline": ctx.get("pipeline_name"),
-                    "question": ctx.get("question"),
+                    "query_id": qid,
+                    "pipeline": pipe,
+                    "question": q,
+                    "source": "user" if qid else "system",
                     "model": kwargs.get("model", "unknown"),
                     "duration_ms": duration_ms,
                     "error": str(response_obj),
-                    "user_prompt": _truncate(user_prompt, 1000),
+                    "user_prompt": user_prompt,
                 }
                 _write_event(event)
             except Exception as e:

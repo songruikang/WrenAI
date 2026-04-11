@@ -59,6 +59,12 @@ class AsyncTextEmbedder:
         # replace newlines, which can negatively affect performance.
         text_to_embed = text.replace("\n", " ")
 
+        try:
+            from sitecustomize import set_trace_context
+            set_trace_context(pipeline_name='embedding')
+        except ImportError:
+            pass
+
         response = await aembedding(
             model=self._model,
             input=[text_to_embed],
@@ -98,6 +104,11 @@ class AsyncDocumentEmbedder:
         self, texts_to_embed: List[str], batch_size: int
     ) -> Tuple[List[List[float]], Dict[str, Any]]:
         async def embed_single_batch(batch: List[str]) -> Any:
+            try:
+                from sitecustomize import set_trace_context
+                set_trace_context(pipeline_name='embedding')
+            except ImportError:
+                pass
             return await aembedding(
                 model=self._model,
                 input=batch,

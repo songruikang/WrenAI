@@ -108,6 +108,19 @@ class LitellmLLMProvider(LLMProvider):
                 "allowed_openai_params", []
             ) + (["reasoning_effort"] if self._model.startswith("gpt-5") else [])
 
+            # 通过 litellm metadata 传递 trace 信息（不依赖 contextvars，避免 asyncio context 丢失）
+            trace_metadata = {}
+            try:
+                from sitecustomize import get_trace_context
+                ctx = get_trace_context()
+                trace_metadata = {
+                    "trace_query_id": query_id or ctx.get("query_id"),
+                    "trace_pipeline": ctx.get("pipeline_name"),
+                    "trace_question": ctx.get("question"),
+                }
+            except ImportError:
+                pass
+
             if self._has_fallbacks:
                 completion = await self._router.acompletion(
                     model=self._model,
@@ -115,6 +128,7 @@ class LitellmLLMProvider(LLMProvider):
                     stream=streaming_callback is not None,
                     allowed_openai_params=allowed_openai_params,
                     mock_testing_fallbacks=self._enable_fallback_testing,
+                    metadata=trace_metadata,
                     **generation_kwargs,
                 )
             else:
@@ -127,6 +141,7 @@ class LitellmLLMProvider(LLMProvider):
                     messages=openai_formatted_messages,
                     stream=streaming_callback is not None,
                     allowed_openai_params=allowed_openai_params,
+                    metadata=trace_metadata,
                     **generation_kwargs,
                 )
 

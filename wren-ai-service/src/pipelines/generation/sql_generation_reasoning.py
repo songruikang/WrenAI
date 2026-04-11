@@ -81,6 +81,11 @@ def prompt(
 async def generate_sql_reasoning(
     prompt: dict, generator: Any, query_id: str, generator_name: str
 ) -> dict:
+    try:
+        from sitecustomize import set_trace_context
+        set_trace_context(pipeline_name='sql_generation_reasoning')
+    except ImportError:
+        pass
     return await generator(
         prompt=prompt.get("prompt"), query_id=query_id
     ), generator_name

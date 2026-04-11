@@ -83,7 +83,10 @@ services:
       - ${PROJECT_DIR}/.env
     volumes:
       - ${PROJECT_DIR}/config.yaml:/app/config.yaml:ro
-      - ${PROJECT_DIR}/data:/app/data:ro
+      - ${PROJECT_DIR}/data:/app/data
+      # [自定义] 挂载 LLM 追踪回调 — 以 sitecustomize.py 方式注入，Python启动时自动加载
+      # 所有 LLM 调用记录写入 /app/data/llm_traces.jsonl，UI 的 Logs 页面读取展示
+      - ${PROJECT_DIR}/trace_callback.py:/app/.venv/lib/python3.12/site-packages/sitecustomize.py:ro
     networks:
       - wren
     depends_on:
@@ -142,6 +145,8 @@ services:
       NEXT_PUBLIC_POSTHOG_HOST: ${POSTHOG_HOST}
       NEXT_PUBLIC_TELEMETRY_ENABLED: ${TELEMETRY_ENABLED}
       EXPERIMENTAL_ENGINE_RUST_VERSION: ${EXPERIMENTAL_ENGINE_RUST_VERSION}
+      # [自定义] 推荐问题开关 — 设为 false 关闭 deploy 后自动生成推荐问题（省 LLM 调用）
+      ENABLE_RECOMMENDATION_QUESTIONS: ${ENABLE_RECOMMENDATION_QUESTIONS:-true}
       # configs
       WREN_PRODUCT_VERSION: ${WREN_PRODUCT_VERSION}
     ports:
@@ -149,6 +154,8 @@ services:
       - ${HOST_PORT}:3000
     volumes:
       - data:/app/data
+      # [自定义] 挂载宿主机 data/ 到 /app/llm_data，用于读取 LLM 追踪日志
+      - ${PROJECT_DIR}/data:/app/llm_data:ro
     networks:
       - wren
     depends_on:

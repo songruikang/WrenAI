@@ -41,6 +41,10 @@ export interface IConfig {
   wrenAIVersion?: string;
   wrenProductVersion?: string;
 
+  // [自定义] 是否启用自动推荐问题生成（deploy后自动调LLM生成推荐问题）
+  // 本地大模型推理慢时建议关闭，避免堵塞LLM调用队列
+  enableRecommendationQuestions?: boolean;
+
   // generate recommendation questions max categories
   projectRecommendationQuestionMaxCategories?: number;
   projectRecommendationQuestionsMaxQuestions?: number;
@@ -130,6 +134,13 @@ const config = {
   wrenEngineVersion: process.env.WREN_ENGINE_VERSION,
   wrenAIVersion: process.env.WREN_AI_SERVICE_VERSION,
   wrenProductVersion: process.env.WREN_PRODUCT_VERSION,
+
+  // [自定义] 推荐问题开关，通过环境变量 ENABLE_RECOMMENDATION_QUESTIONS 控制
+  // 不设置或设置为 true 时启用（保持原版默认行为），设置为 false 关闭
+  enableRecommendationQuestions:
+    process.env.ENABLE_RECOMMENDATION_QUESTIONS === undefined
+      ? true
+      : process.env.ENABLE_RECOMMENDATION_QUESTIONS.toLowerCase() === 'true',
 
   // generate recommendation questions max questions
   projectRecommendationQuestionMaxCategories: process.env

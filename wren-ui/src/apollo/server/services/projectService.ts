@@ -132,6 +132,11 @@ export class ProjectService implements IProjectService {
   }
 
   public async generateProjectRecommendationQuestions(): Promise<void> {
+    // [自定义] 通过环境变量 ENABLE_RECOMMENDATION_QUESTIONS=false 关闭
+    if (!config.enableRecommendationQuestions) {
+      logger.info('Recommendation questions generation is disabled');
+      return;
+    }
     const project = await this.getCurrentProject();
     if (!project) {
       throw new Error(`Project not found`);

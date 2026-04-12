@@ -166,6 +166,22 @@ try:
                 if start_time and end_time:
                     duration_ms = int((end_time - start_time).total_seconds() * 1000)
 
+                # Try multiple sources for error info
+                error_msg = ""
+                if response_obj is not None:
+                    error_msg = str(response_obj)
+                if not error_msg or error_msg == "None":
+                    # Try to get from kwargs
+                    error_msg = str(kwargs.get("exception", ""))
+                if not error_msg or error_msg == "None":
+                    # Try litellm_params
+                    error_msg = str(kwargs.get("litellm_params", {}).get("exception", ""))
+                if not error_msg or error_msg == "None":
+                    error_msg = "Unknown error"
+
+                if not user_prompt and error_msg:
+                    user_prompt = f"[Error occurred during LLM call]\n{error_msg[:500]}"
+
                 event = {
                     "type": "llm_error",
                     "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -175,7 +191,7 @@ try:
                     "source": "user" if qid else "system",
                     "model": kwargs.get("model", "unknown"),
                     "duration_ms": duration_ms,
-                    "error": str(response_obj),
+                    "error": error_msg,
                     "user_prompt": user_prompt,
                 }
                 _write_event(event)

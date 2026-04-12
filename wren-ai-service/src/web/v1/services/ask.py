@@ -13,6 +13,19 @@ from src.web.v1.services import BaseRequest, SSEEvent
 logger = logging.getLogger("wren-ai-service")
 
 
+def _write_trace_event(event: dict):
+    """Write a non-LLM trace event directly to JSONL."""
+    try:
+        import json
+        from datetime import datetime, timezone
+        TRACE_FILE = "/app/data/llm_traces.jsonl"
+        event.setdefault("timestamp", datetime.now(timezone.utc).isoformat())
+        with open(TRACE_FILE, "a") as f:
+            f.write(json.dumps(event, ensure_ascii=False, default=str) + "\n")
+    except Exception:
+        pass
+
+
 class AskHistory(BaseModel):
     sql: str
     question: str
@@ -518,9 +531,42 @@ class AskService:
                             }
                         )
                     ]
+                    try:
+                        _write_trace_event({
+                            "type": "sql_event",
+                            "query_id": query_id,
+                            "pipeline": "sql_dryrun",
+                            "question": user_query,
+                            "source": "user",
+                            "model": "wren-engine",
+                            "duration_ms": 0,
+                            "tokens": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
+                            "system_prompt": "",
+                            "user_prompt": sql_valid_result.get("sql", ""),
+                            "response": "Dry run passed",
+                        })
+                    except Exception:
+                        pass
                 elif failed_dry_run_result := text_to_sql_generation_results[
                     "post_process"
                 ]["invalid_generation_result"]:
+                    try:
+                        _write_trace_event({
+                            "type": "sql_event",
+                            "query_id": query_id,
+                            "pipeline": "sql_dryrun",
+                            "question": user_query,
+                            "source": "user",
+                            "model": "wren-engine",
+                            "duration_ms": 0,
+                            "tokens": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
+                            "system_prompt": "",
+                            "user_prompt": failed_dry_run_result.get("sql", ""),
+                            "response": f"Dry run failed: {failed_dry_run_result.get('error', 'unknown error')}",
+                            "error": failed_dry_run_result.get("error", ""),
+                        })
+                    except Exception:
+                        pass
                     while current_sql_correction_retries < max_sql_correction_retries:
                         if failed_dry_run_result["type"] == "TIME_OUT":
                             break
@@ -585,6 +631,22 @@ class AskService:
                                     }
                                 )
                             ]
+                            try:
+                                _write_trace_event({
+                                    "type": "sql_event",
+                                    "query_id": query_id,
+                                    "pipeline": "sql_correction_dryrun",
+                                    "question": user_query,
+                                    "source": "user",
+                                    "model": "wren-engine",
+                                    "duration_ms": 0,
+                                    "tokens": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
+                                    "system_prompt": "",
+                                    "user_prompt": valid_generation_result.get("sql", ""),
+                                    "response": f"Correction dry run passed (attempt {current_sql_correction_retries})",
+                                })
+                            except Exception:
+                                pass
                             break
 
                         failed_dry_run_result = sql_correction_results["post_process"][

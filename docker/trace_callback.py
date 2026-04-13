@@ -50,9 +50,24 @@ def _truncate(text, max_len=2000):
     return text[:half] + "\n... (" + str(len(text) - max_len) + " chars truncated) ...\n" + text[-half:]
 
 
+MAX_TRACE_SIZE = int(os.environ.get("MAX_TRACE_SIZE_MB", "50")) * 1024 * 1024  # 默认 50MB
+
+
 def _write_event(event):
     with _lock:
         try:
+            # 文件超过限制时自动 rotation：保留后半部分
+            if os.path.exists(TRACE_FILE) and os.path.getsize(TRACE_FILE) > MAX_TRACE_SIZE:
+                try:
+                    with open(TRACE_FILE, "r") as f:
+                        lines = f.readlines()
+                    # 保留后 60% 的行
+                    keep = lines[len(lines) * 2 // 5:]
+                    with open(TRACE_FILE, "w") as f:
+                        f.writelines(keep)
+                    print(f"[trace_callback] rotated: {len(lines)} → {len(keep)} lines")
+                except Exception:
+                    pass
             with open(TRACE_FILE, "a") as f:
                 f.write(json.dumps(event, ensure_ascii=False, default=str) + "\n")
         except Exception as e:

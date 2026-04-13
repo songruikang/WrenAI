@@ -19,6 +19,7 @@ const UNKNOWN_GROUP_WINDOW_MS = 5_000; // 5 s for legacy events without query_id
 // --- In-memory state for incremental import ------------------------------
 
 let lastImportedLineCount = 0;
+let lastImportedByteOffset = 0;
 
 // --- Types ---------------------------------------------------------------
 
@@ -75,6 +76,8 @@ interface GroupedStep {
 function getDb(): Database.Database {
   const db = new Database(DB_PATH);
   db.pragma('journal_mode = WAL');
+  db.pragma('busy_timeout = 30000');
+  db.pragma('synchronous = NORMAL');
   db.pragma('foreign_keys = ON');
   return db;
 }
@@ -262,13 +265,27 @@ function buildGroup(queryId: string, events: RawTraceEvent[]): GroupedQuery {
 function importNewLines(db: Database.Database) {
   if (!fs.existsSync(TRACE_FILE)) return;
 
-  const content = fs.readFileSync(TRACE_FILE, 'utf-8');
-  const allLines = content.split('\n').filter(Boolean);
-  const totalLines = allLines.length;
+  // 用文件大小判断是否有新内容（避免读取整个文件）
+  const stat = fs.statSync(TRACE_FILE);
+  if (stat.size <= lastImportedByteOffset) {
+    // 文件可能被 rotation 截断了，重置
+    if (stat.size < lastImportedByteOffset) {
+      lastImportedByteOffset = 0;
+      lastImportedLineCount = 0;
+    }
+    return;
+  }
 
-  if (totalLines <= lastImportedLineCount) return; // nothing new
+  // 只读取新增部分（从上次偏移量开始）
+  const fd = fs.openSync(TRACE_FILE, 'r');
+  const newSize = stat.size - lastImportedByteOffset;
+  const buffer = Buffer.alloc(Math.min(newSize, 10 * 1024 * 1024)); // 单次最多读 10MB
+  fs.readSync(fd, buffer, 0, buffer.length, lastImportedByteOffset);
+  fs.closeSync(fd);
 
-  const newLines = allLines.slice(lastImportedLineCount);
+  const newContent = buffer.toString('utf-8');
+  const newLines = newContent.split('\n').filter(Boolean);
+
   const newEvents: RawTraceEvent[] = [];
   for (const line of newLines) {
     try {
@@ -278,8 +295,10 @@ function importNewLines(db: Database.Database) {
     }
   }
 
+  lastImportedByteOffset = Math.min(lastImportedByteOffset + buffer.length, stat.size);
+  lastImportedLineCount += newLines.length;
+
   if (!newEvents.length) {
-    lastImportedLineCount = totalLines;
     return;
   }
 
@@ -335,7 +354,6 @@ function importNewLines(db: Database.Database) {
   });
 
   importAll();
-  lastImportedLineCount = totalLines;
 }
 
 // --- API Handler ---------------------------------------------------------

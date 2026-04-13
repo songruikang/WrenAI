@@ -1,33 +1,10 @@
 # WrenAI 开发环境 Docker Compose（公司云主机）
 #
-# 与 docker-compose.yaml (Mac) 的区别：
-#   - wren-ai-service: 本地 build
-#   - wren-ui: 本地 build，使用 Dockerfile.cloud（代理+宿主机node_modules）
-#   - build 使用 network: host 走宿主机代理
-#   - qdrant v1.17.0（匹配 qdrant-client 1.12.1）
+# 所有持久化数据统一 bind mount 到宿主机 ${PROJECT_DIR}/data/
+# 不使用 Docker named volume，避免 overlay2 上 SQLite 损坏问题
 #
-# 构建命令（不用 compose build，用独立 docker build 避免 BuildKit 问题）：
-#   socat TCP-LISTEN:3128,bind=172.17.0.1,fork,reuseaddr TCP:127.0.0.1:3128 &
-#
-#   cd ../wren-ui
-#   DOCKER_BUILDKIT=0 docker build \
-#     --build-arg HTTP_PROXY=http://172.17.0.1:3128 \
-#     --build-arg HTTPS_PROXY=http://172.17.0.1:3128 \
-#     -t wrenai-wren-ui:latest -f Dockerfile.cloud .
-#
-#   cd ../wren-ai-service
-#   DOCKER_BUILDKIT=0 docker build \
-#     --build-arg HTTP_PROXY=http://172.17.0.1:3128 \
-#     --build-arg HTTPS_PROXY=http://172.17.0.1:3128 \
-#     -t wrenai-wren-ai-service:latest -f docker/Dockerfile.cloud .
-#
-#   pkill -f "socat.*3128"
-#
-# 启动命令：
-#   cd docker && docker compose -f docker-compose-dev.yaml up -d
-
-volumes:
-  data:
+# 构建: bash docker/deploy-cloud.sh build
+# 启动: bash docker/deploy-cloud.sh up
 
 networks:
   wren:
@@ -41,7 +18,7 @@ services:
     environment:
       DATA_PATH: /app/data
     volumes:
-      - data:/app/data
+      - ${PROJECT_DIR}/data:/app/data
     command: /bin/sh /app/init.sh
 
   wren-engine:
@@ -52,7 +29,7 @@ services:
       - ${WREN_ENGINE_PORT}
       - ${WREN_ENGINE_SQL_PORT}
     volumes:
-      - data:/usr/src/app/etc
+      - ${PROJECT_DIR}/data:/usr/src/app/etc
       - ${PROJECT_DIR}/data:/usr/src/app/data
     networks:
       - wren
@@ -68,12 +45,11 @@ services:
     environment:
       WREN_ENGINE_ENDPOINT: http://wren-engine:${WREN_ENGINE_PORT}
     volumes:
-      - ${LOCAL_STORAGE:-.}:/usr/src/app/data
+      - ${PROJECT_DIR}/data:/usr/src/app/data
     networks:
       - wren
 
   wren-ai-service:
-    # [dev] 本地 build — 公司环境建议用独立 docker build（见文件头注释）
     image: wrenai-wren-ai-service:latest
     build:
       context: ../wren-ai-service
@@ -93,7 +69,6 @@ services:
     volumes:
       - ${PROJECT_DIR}/config.yaml:/app/config.yaml:ro
       - ${PROJECT_DIR}/data:/app/data
-      # [自定义] LLM 追踪回调 — sitecustomize.py 方式注入
       - ${PROJECT_DIR}/trace_callback.py:/app/.venv/lib/python3.12/site-packages/sitecustomize.py:ro
     networks:
       - wren
@@ -101,19 +76,17 @@ services:
       - qdrant
 
   qdrant:
-    # 公司环境 v1.17.0（匹配 qdrant-client 1.12.1）
     image: qdrant/qdrant:v1.17.0
     restart: on-failure
     expose:
       - 6333
       - 6334
     volumes:
-      - data:/qdrant/storage
+      - ${PROJECT_DIR}/data/qdrant:/qdrant/storage
     networks:
       - wren
 
   wren-ui:
-    # [dev] 本地 build — 使用 Dockerfile.cloud（代理环境专用）
     image: wrenai-wren-ui:latest
     build:
       context: ../wren-ui
@@ -142,13 +115,11 @@ services:
       NEXT_PUBLIC_POSTHOG_HOST: ${POSTHOG_HOST}
       NEXT_PUBLIC_TELEMETRY_ENABLED: ${TELEMETRY_ENABLED}
       EXPERIMENTAL_ENGINE_RUST_VERSION: ${EXPERIMENTAL_ENGINE_RUST_VERSION}
-      # [自定义] 推荐问题开关
       ENABLE_RECOMMENDATION_QUESTIONS: ${ENABLE_RECOMMENDATION_QUESTIONS:-true}
     ports:
       - ${HOST_PORT}:3000
     volumes:
-      - data:/app/data
-      # [自定义] 挂载宿主机 data/ 到 /app/llm_data，用于读取 LLM 追踪日志
+      - ${PROJECT_DIR}/data:/app/data
       - ${PROJECT_DIR}/data:/app/llm_data:ro
     networks:
       - wren

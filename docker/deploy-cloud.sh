@@ -96,6 +96,7 @@ do_build() {
 # ─── 启动 ───
 do_up() {
     cd "$DOCKER_DIR"
+    mkdir -p data/qdrant
     docker compose -f docker-compose-dev.yaml up -d
     ok "所有服务已启动"
     echo ""
@@ -112,8 +113,9 @@ do_down() {
 # ─── 全量清库 ───
 do_reset() {
     cd "$DOCKER_DIR"
-    info "停止并删除所有数据卷"
-    docker compose -f docker-compose-dev.yaml down -v
+    info "停止服务并清除所有数据"
+    docker compose -f docker-compose-dev.yaml down
+    rm -rf "$DOCKER_DIR/data"
     ok "清库完成，重新启动需要走完整导入流程（见 README）"
 }
 

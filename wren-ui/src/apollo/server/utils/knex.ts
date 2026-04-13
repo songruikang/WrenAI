@@ -30,12 +30,19 @@ export const bootstrapKnex = (options: KnexOptions) => {
           conn: any,
           done: (err: Error | null, conn: any) => void,
         ) => {
-          conn.pragma('journal_mode = WAL');
-          conn.pragma('busy_timeout = 30000');
-          conn.pragma('synchronous = NORMAL');
-          conn.pragma('foreign_keys = ON');
-          conn.pragma('cache_size = -64000');
-          done(null, conn);
+          try {
+            conn.pragma('journal_mode = WAL');
+            conn.pragma('busy_timeout = 30000');
+            conn.pragma('synchronous = NORMAL');
+            conn.pragma('foreign_keys = ON');
+            conn.pragma('cache_size = -64000');
+            const mode = conn.pragma('journal_mode', { simple: true });
+            console.log(`[sqlite] pragma applied, journal_mode=${mode}`);
+            done(null, conn);
+          } catch (err: any) {
+            console.error('[sqlite] pragma failed:', err?.message || err);
+            done(err, conn);
+          }
         },
       },
     });

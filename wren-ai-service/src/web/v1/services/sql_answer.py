@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from src.core.pipeline import BasicPipeline
 from src.utils import trace_metadata
 from src.web.v1.services import BaseRequest, SSEEvent
+from src.web.v1.services.ask import _create_traced_task
 
 logger = logging.getLogger("wren-ai-service")
 
@@ -93,7 +94,7 @@ class SqlAnswerService:
                 trace_id=trace_id,
             )
 
-            asyncio.create_task(
+            _create_traced_task(
                 self._pipelines["sql_answer"].run(
                     query=sql_answer_request.query,
                     sql=sql_answer_request.sql,
@@ -102,7 +103,8 @@ class SqlAnswerService:
                     current_time=sql_answer_request.configurations.show_current_time(),
                     query_id=query_id,
                     custom_instruction=sql_answer_request.custom_instruction,
-                )
+                ),
+                query_id=query_id, question=sql_answer_request.query,
             )
 
             return results

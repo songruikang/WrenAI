@@ -13,6 +13,21 @@ from src.web.v1.services import BaseRequest, SSEEvent
 logger = logging.getLogger("wren-ai-service")
 
 
+def _create_traced_task(coro, query_id: str = None, question: str = None):
+    """创建后台 asyncio task，确保 trace context 被正确传递。
+    asyncio.create_task() 虽然会复制 ContextVar，但后续 pipeline 可能覆盖它。
+    显式在 task 开头重设 trace context 最可靠。
+    """
+    async def _wrapper():
+        try:
+            from sitecustomize import set_trace_context
+            set_trace_context(query_id=query_id, question=question)
+        except ImportError:
+            pass
+        return await coro
+    return asyncio.create_task(_wrapper())
+
+
 def _write_trace_event(event: dict):
     """Write a non-LLM trace event directly to JSONL."""
     try:
@@ -275,7 +290,7 @@ class AskService:
                             user_query = rephrased_question
 
                         if intent == "MISLEADING_QUERY":
-                            asyncio.create_task(
+                            _create_traced_task(
                                 self._pipelines["misleading_assistance"].run(
                                     query=user_query,
                                     histories=histories,
@@ -285,7 +300,8 @@ class AskService:
                                     language=ask_request.configurations.language,
                                     query_id=ask_request.query_id,
                                     custom_instruction=ask_request.custom_instruction,
-                                )
+                                ),
+                                query_id=query_id, question=user_query,
                             )
 
                             self._ask_results[query_id] = AskResultResponse(
@@ -300,7 +316,7 @@ class AskService:
                             results["metadata"]["type"] = "MISLEADING_QUERY"
                             return results
                         elif intent == "GENERAL":
-                            asyncio.create_task(
+                            _create_traced_task(
                                 self._pipelines["data_assistance"].run(
                                     query=user_query,
                                     histories=histories,
@@ -310,7 +326,8 @@ class AskService:
                                     language=ask_request.configurations.language,
                                     query_id=ask_request.query_id,
                                     custom_instruction=ask_request.custom_instruction,
-                                )
+                                ),
+                                query_id=query_id, question=user_query,
                             )
 
                             self._ask_results[query_id] = AskResultResponse(
@@ -325,13 +342,14 @@ class AskService:
                             results["metadata"]["type"] = "GENERAL"
                             return results
                         elif intent == "USER_GUIDE":
-                            asyncio.create_task(
+                            _create_traced_task(
                                 self._pipelines["user_guide_assistance"].run(
                                     query=user_query,
                                     language=ask_request.configurations.language,
                                     query_id=ask_request.query_id,
                                     custom_instruction=ask_request.custom_instruction,
-                                )
+                                ),
+                                query_id=query_id, question=user_query,
                             )
 
                             self._ask_results[query_id] = AskResultResponse(

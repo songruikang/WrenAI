@@ -18,7 +18,6 @@ const UNKNOWN_GROUP_WINDOW_MS = 5_000; // 5 s for legacy events without query_id
 
 // --- In-memory state for incremental import ------------------------------
 
-let __lastImportedLineCount = 0;
 let lastImportedByteOffset = 0;
 
 // --- Types ---------------------------------------------------------------
@@ -271,7 +270,6 @@ function importNewLines(db: Database.Database) {
     // 文件可能被 rotation 截断了，重置
     if (stat.size < lastImportedByteOffset) {
       lastImportedByteOffset = 0;
-      _lastImportedLineCount = 0;
     }
     return;
   }
@@ -299,7 +297,7 @@ function importNewLines(db: Database.Database) {
     lastImportedByteOffset + buffer.length,
     stat.size,
   );
-  _lastImportedLineCount += newLines.length;
+
 
   if (!newEvents.length) {
     return;

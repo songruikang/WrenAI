@@ -1,13 +1,14 @@
-import { useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { isEmpty, debounce } from 'lodash';
 import clsx from 'clsx';
-import { Button, Typography, Tabs, Tag, Tooltip } from 'antd';
+import { Button, Select, Typography, Tabs, Tag, Tooltip } from 'antd';
 import styled from 'styled-components';
 import CheckCircleFilled from '@ant-design/icons/CheckCircleFilled';
 import CodeFilled from '@ant-design/icons/CodeFilled';
 import PieChartFilled from '@ant-design/icons/PieChartFilled';
 import MessageOutlined from '@ant-design/icons/MessageOutlined';
 import ShareAltOutlined from '@ant-design/icons/ShareAltOutlined';
+import BulbOutlined from '@ant-design/icons/BulbOutlined';
 import { RobotSVG } from '@/utils/svgs';
 import { ANSWER_TAB_KEYS } from '@/utils/enum';
 import { canGenerateAnswer } from '@/hooks/useAskPrompt';
@@ -141,21 +142,83 @@ const QuestionTitle = (props) => {
   );
 };
 
-const renderRecommendedQuestions = (
-  isLastThreadResponse: boolean,
-  recommendedQuestionProps,
-  onSelect: RecommendedQuestionsProps['onSelect'],
-) => {
-  if (!isLastThreadResponse || !recommendedQuestionProps.show) return null;
+function RecommendedQuestionsSection(props: {
+  isLastThreadResponse: boolean;
+  recommendedQuestionProps: any;
+  onSelect: RecommendedQuestionsProps['onSelect'];
+  onGenerate: (maxCategories?: number, maxQuestions?: number) => void;
+}) {
+  const {
+    isLastThreadResponse,
+    recommendedQuestionProps,
+    onSelect,
+    onGenerate,
+  } = props;
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([
+    'Descriptive Questions',
+    'Comparative Questions',
+  ]);
+  const [questionsPerCategory, setQuestionsPerCategory] = useState(1);
+
+  if (!isLastThreadResponse) return null;
+
+  if (recommendedQuestionProps.show) {
+    return (
+      <RecommendedQuestions
+        className="mt-5 mb-4"
+        {...recommendedQuestionProps.state}
+        onSelect={onSelect}
+      />
+    );
+  }
 
   return (
-    <RecommendedQuestions
+    <div
       className="mt-5 mb-4"
-      {...recommendedQuestionProps.state}
-      onSelect={onSelect}
-    />
+      style={{ display: 'flex', alignItems: 'center', gap: 8 }}
+    >
+      <BulbOutlined className="gray-6" />
+      <Select
+        size="small"
+        mode="multiple"
+        value={selectedCategories}
+        onChange={setSelectedCategories}
+        style={{ minWidth: 180 }}
+        maxTagCount={2}
+        options={[
+          { value: 'Descriptive Questions', label: '描述统计' },
+          { value: 'Segmentation Questions', label: '数据细分' },
+          { value: 'Comparative Questions', label: '对比分析' },
+          { value: 'Data Quality Questions', label: '数据质量' },
+        ]}
+        placeholder="选择分类"
+      />
+      <Select
+        size="small"
+        value={questionsPerCategory}
+        onChange={setQuestionsPerCategory}
+        style={{ width: 60 }}
+        options={[
+          { value: 1, label: '1' },
+          { value: 2, label: '2' },
+          { value: 3, label: '3' },
+        ]}
+      />
+      <span className="gray-7 text-sm">题/类</span>
+      <Button
+        type="primary"
+        size="small"
+        ghost
+        disabled={selectedCategories.length === 0}
+        onClick={() =>
+          onGenerate(selectedCategories.length, questionsPerCategory)
+        }
+      >
+        生成推荐
+      </Button>
+    </div>
   );
-};
+}
 
 const AdjustmentInformation = (props: {
   adjustment: ThreadResponseAdjustment;
@@ -244,7 +307,6 @@ export default function AnswerResult(props: Props) {
       const debouncedGenerateAnswer = debounce(
         () => {
           onGenerateTextBasedAnswer(id);
-          onGenerateThreadRecommendedQuestions();
         },
         250,
         { leading: false, trailing: true },
@@ -385,11 +447,12 @@ export default function AnswerResult(props: Props) {
               }
             />
           </div>
-          {renderRecommendedQuestions(
-            isLastThreadResponse,
-            recommendedQuestionProps,
-            onSelectRecommendedQuestion,
-          )}
+          <RecommendedQuestionsSection
+            isLastThreadResponse={isLastThreadResponse}
+            recommendedQuestionProps={recommendedQuestionProps}
+            onSelect={onSelectRecommendedQuestion}
+            onGenerate={onGenerateThreadRecommendedQuestions}
+          />
         </>
       )}
     </div>

@@ -211,7 +211,11 @@ export interface IAskingService {
   getInstantRecommendedQuestions(
     queryId: string,
   ): Promise<RecommendationQuestionsResult>;
-  generateThreadRecommendationQuestions(threadId: number): Promise<void>;
+  generateThreadRecommendationQuestions(
+    threadId: number,
+    maxCategories?: number,
+    maxQuestions?: number,
+  ): Promise<void>;
   getThreadRecommendationQuestions(
     threadId: number,
   ): Promise<ThreadRecommendQuestionResult>;
@@ -518,6 +522,8 @@ export class AskingService implements IAskingService {
 
   public async generateThreadRecommendationQuestions(
     threadId: number,
+    maxCategories?: number,
+    maxQuestions?: number,
   ): Promise<void> {
     const thread = await this.threadRepository.findOneBy({ id: threadId });
     if (!thread) {
@@ -541,11 +547,15 @@ export class AskingService implements IAskingService {
     const slicedThreadResponses = threadResponses
       .sort((a, b) => b.id - a.id)
       .slice(0, 5);
-    const questions = slicedThreadResponses.map(({ question }) => question);
+    const questions = slicedThreadResponses
+      .map(({ question }) => question)
+      .filter((q): q is string => !!q);
     const recommendQuestionData: RecommendationQuestionsInput = {
       manifest,
       previousQuestions: questions,
       ...this.getThreadRecommendationQuestionsConfig(project),
+      ...(maxCategories !== undefined && { maxCategories }),
+      ...(maxQuestions !== undefined && { maxQuestions }),
     };
 
     const result = await this.wrenAIAdaptor.generateRecommendationQuestions(

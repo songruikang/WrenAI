@@ -209,8 +209,13 @@ export default function HomeThread() {
     fetchThreadResponse({ variables: { responseId } });
   };
 
-  const onGenerateThreadRecommendedQuestions = async () => {
-    await generateThreadRecommendationQuestions({ variables: { threadId } });
+  const onGenerateThreadRecommendedQuestions = async (
+    maxCategories?: number,
+    maxQuestions?: number,
+  ) => {
+    await generateThreadRecommendationQuestions({
+      variables: { threadId, maxCategories, maxQuestions },
+    });
     fetchThreadRecommendationQuestions({ variables: { threadId } });
   };
 

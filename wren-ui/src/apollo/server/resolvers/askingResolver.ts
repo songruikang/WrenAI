@@ -129,21 +129,32 @@ export class AskingResolver {
 
   public async generateProjectRecommendationQuestions(
     _root: any,
-    _args: any,
+    args: { maxCategories?: number; maxQuestions?: number },
     ctx: IContext,
   ): Promise<boolean> {
-    await ctx.projectService.generateProjectRecommendationQuestions();
+    await ctx.projectService.generateProjectRecommendationQuestions(
+      args.maxCategories,
+      args.maxQuestions,
+    );
     return true;
   }
 
   public async generateThreadRecommendationQuestions(
     _root: any,
-    args: { threadId: number },
+    args: {
+      threadId: number;
+      maxCategories?: number;
+      maxQuestions?: number;
+    },
     ctx: IContext,
   ): Promise<boolean> {
-    const { threadId } = args;
+    const { threadId, maxCategories, maxQuestions } = args;
     const askingService = ctx.askingService;
-    await askingService.generateThreadRecommendationQuestions(threadId);
+    await askingService.generateThreadRecommendationQuestions(
+      threadId,
+      maxCategories,
+      maxQuestions,
+    );
     return true;
   }
 

@@ -108,11 +108,16 @@ export default function useRecommendedQuestionsInstruction() {
     }
   }, [recommendedQuestionsTask]);
 
-  const onGetRecommendationQuestions = async () => {
+  const onGetRecommendationQuestions = async (
+    maxCategories?: number,
+    maxQuestions?: number,
+  ) => {
     setGenerating(true);
     setIsRegenerate(true);
     try {
-      await generateProjectRecommendationQuestions();
+      await generateProjectRecommendationQuestions({
+        variables: { maxCategories, maxQuestions },
+      });
       fetchRecommendationQuestions();
     } catch (error) {
       console.error(error);
@@ -154,5 +159,6 @@ export default function useRecommendedQuestionsInstruction() {
     showRetry,
     showRecommendedQuestionsPromptMode,
     buttonProps,
+    onGetRecommendationQuestions,
   };
 }

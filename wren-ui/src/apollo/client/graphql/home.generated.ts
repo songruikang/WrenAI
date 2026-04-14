@@ -162,13 +162,18 @@ export type GetProjectRecommendationQuestionsQueryVariables = Types.Exact<{ [key
 
 export type GetProjectRecommendationQuestionsQuery = { __typename?: 'Query', getProjectRecommendationQuestions: { __typename?: 'RecommendedQuestionsTask', status: Types.RecommendedQuestionsTaskStatus, questions: Array<{ __typename?: 'ResultQuestion', question: string, category: string, sql: string }>, error?: { __typename?: 'Error', code?: string | null, shortMessage?: string | null, message?: string | null, stacktrace?: Array<string | null> | null } | null } };
 
-export type GenerateProjectRecommendationQuestionsMutationVariables = Types.Exact<{ [key: string]: never; }>;
+export type GenerateProjectRecommendationQuestionsMutationVariables = Types.Exact<{
+  maxCategories?: Types.InputMaybe<Types.Scalars['Int']>;
+  maxQuestions?: Types.InputMaybe<Types.Scalars['Int']>;
+}>;
 
 
 export type GenerateProjectRecommendationQuestionsMutation = { __typename?: 'Mutation', generateProjectRecommendationQuestions: boolean };
 
 export type GenerateThreadRecommendationQuestionsMutationVariables = Types.Exact<{
   threadId: Types.Scalars['Int'];
+  maxCategories?: Types.InputMaybe<Types.Scalars['Int']>;
+  maxQuestions?: Types.InputMaybe<Types.Scalars['Int']>;
 }>;
 
 
@@ -1064,8 +1069,8 @@ export type GetProjectRecommendationQuestionsQueryHookResult = ReturnType<typeof
 export type GetProjectRecommendationQuestionsLazyQueryHookResult = ReturnType<typeof useGetProjectRecommendationQuestionsLazyQuery>;
 export type GetProjectRecommendationQuestionsQueryResult = Apollo.QueryResult<GetProjectRecommendationQuestionsQuery, GetProjectRecommendationQuestionsQueryVariables>;
 export const GenerateProjectRecommendationQuestionsDocument = gql`
-    mutation GenerateProjectRecommendationQuestions {
-  generateProjectRecommendationQuestions
+    mutation GenerateProjectRecommendationQuestions($maxCategories: Int, $maxQuestions: Int) {
+  generateProjectRecommendationQuestions(maxCategories: $maxCategories, maxQuestions: $maxQuestions)
 }
     `;
 export type GenerateProjectRecommendationQuestionsMutationFn = Apollo.MutationFunction<GenerateProjectRecommendationQuestionsMutation, GenerateProjectRecommendationQuestionsMutationVariables>;
@@ -1094,8 +1099,8 @@ export type GenerateProjectRecommendationQuestionsMutationHookResult = ReturnTyp
 export type GenerateProjectRecommendationQuestionsMutationResult = Apollo.MutationResult<GenerateProjectRecommendationQuestionsMutation>;
 export type GenerateProjectRecommendationQuestionsMutationOptions = Apollo.BaseMutationOptions<GenerateProjectRecommendationQuestionsMutation, GenerateProjectRecommendationQuestionsMutationVariables>;
 export const GenerateThreadRecommendationQuestionsDocument = gql`
-    mutation GenerateThreadRecommendationQuestions($threadId: Int!) {
-  generateThreadRecommendationQuestions(threadId: $threadId)
+    mutation GenerateThreadRecommendationQuestions($threadId: Int!, $maxCategories: Int, $maxQuestions: Int) {
+  generateThreadRecommendationQuestions(threadId: $threadId, maxCategories: $maxCategories, maxQuestions: $maxQuestions)
 }
     `;
 export type GenerateThreadRecommendationQuestionsMutationFn = Apollo.MutationFunction<GenerateThreadRecommendationQuestionsMutation, GenerateThreadRecommendationQuestionsMutationVariables>;

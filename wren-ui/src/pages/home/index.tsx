@@ -1,6 +1,7 @@
-import { ComponentRef, useMemo, useRef } from 'react';
+import { ComponentRef, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
-import { Button, Typography } from 'antd';
+import { Button, Select, Typography } from 'antd';
+import BulbOutlined from '@ant-design/icons/BulbOutlined';
 import { Logo } from '@/components/Logo';
 import { Path } from '@/utils/enum';
 import SiderLayout from '@/components/layouts/SiderLayout';
@@ -45,6 +46,64 @@ const SampleQuestionsInstruction = (props) => {
   );
 };
 
+const CATEGORY_OPTIONS = [
+  { value: 'Descriptive Questions', label: '描述统计' },
+  { value: 'Segmentation Questions', label: '数据细分' },
+  { value: 'Comparative Questions', label: '对比分析' },
+  { value: 'Data Quality Questions', label: '数据质量' },
+];
+
+function RecommendQuestionControls(props: {
+  generating: boolean;
+  onGenerate: (maxCategories: number, maxQuestions: number) => void;
+  label?: string;
+}) {
+  const { generating, onGenerate, label = '生成推荐' } = props;
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([
+    'Descriptive Questions',
+    'Comparative Questions',
+  ]);
+  const [questionsPerCategory, setQuestionsPerCategory] = useState(1);
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <BulbOutlined className="gray-6" />
+      <Select
+        size="small"
+        mode="multiple"
+        value={selectedCategories}
+        onChange={setSelectedCategories}
+        style={{ minWidth: 200 }}
+        maxTagCount={2}
+        options={CATEGORY_OPTIONS}
+        placeholder="选择分类"
+      />
+      <Select
+        size="small"
+        value={questionsPerCategory}
+        onChange={setQuestionsPerCategory}
+        style={{ width: 60 }}
+        options={[
+          { value: 1, label: '1' },
+          { value: 2, label: '2' },
+          { value: 3, label: '3' },
+        ]}
+      />
+      <span className="gray-7 text-sm">题/类</span>
+      <Button
+        size="small"
+        loading={generating}
+        disabled={selectedCategories.length === 0}
+        onClick={() =>
+          onGenerate(selectedCategories.length, questionsPerCategory)
+        }
+      >
+        {label}
+      </Button>
+    </div>
+  );
+}
+
 function RecommendedQuestionsInstruction(props) {
   const { onSelect, loading } = props;
 
@@ -54,6 +113,7 @@ function RecommendedQuestionsInstruction(props) {
     recommendedQuestions,
     showRetry,
     showRecommendedQuestionsPromptMode,
+    onGetRecommendationQuestions,
   } = useRecommendedQuestionsInstruction();
 
   return showRecommendedQuestionsPromptMode ? (
@@ -66,11 +126,24 @@ function RecommendedQuestionsInstruction(props) {
         onSelect={onSelect}
         loading={loading}
       />
+      <div className="mt-4">
+        <RecommendQuestionControls
+          generating={generating}
+          onGenerate={onGetRecommendationQuestions}
+          label="重新生成"
+        />
+      </div>
       <div className="py-12" />
     </div>
   ) : (
     <Wrapper>
-      <Button className="mt-6" {...buttonProps} />
+      <div className="mt-6">
+        <RecommendQuestionControls
+          generating={generating}
+          onGenerate={onGetRecommendationQuestions}
+          label={buttonProps.children === 'Retry' ? '重试' : '生成推荐问题'}
+        />
+      </div>
       {generating && (
         <Text className="mt-3 text-sm gray-6">
           Thinking of good questions for you... (about 1 minute)

@@ -873,6 +873,8 @@ export type MutationGenerateQuestionArgs = {
 
 export type MutationGenerateThreadRecommendationQuestionsArgs = {
   threadId: Scalars['Int'];
+  maxCategories?: InputMaybe<Scalars['Int']>;
+  maxQuestions?: InputMaybe<Scalars['Int']>;
 };
 
 

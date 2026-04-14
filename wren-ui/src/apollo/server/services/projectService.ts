@@ -79,7 +79,10 @@ export interface IProjectService {
   getProjectRecommendationQuestions: () => Promise<ProjectRecommendationQuestionsResult>;
 
   // recommend questions
-  generateProjectRecommendationQuestions: () => Promise<void>;
+  generateProjectRecommendationQuestions: (
+    maxCategories?: number,
+    maxQuestions?: number,
+  ) => Promise<void>;
 }
 
 export class ProjectService implements IProjectService {
@@ -131,10 +134,14 @@ export class ProjectService implements IProjectService {
     return await this.metadataService.getVersion(usedProject);
   }
 
-  public async generateProjectRecommendationQuestions(): Promise<void> {
-    // [自定义] 通过环境变量 ENABLE_RECOMMENDATION_QUESTIONS=false 关闭
-    if (!config.enableRecommendationQuestions) {
-      logger.info('Recommendation questions generation is disabled');
+  public async generateProjectRecommendationQuestions(
+    maxCategories?: number,
+    maxQuestions?: number,
+  ): Promise<void> {
+    // [自定义] 环境变量只控制 Deploy 后的自动推荐；手动调用（带参数）不受限
+    const isManualTrigger = maxCategories !== undefined;
+    if (!isManualTrigger && !config.enableRecommendationQuestions) {
+      logger.info('Auto recommendation questions generation is disabled');
       return;
     }
     const project = await this.getCurrentProject();
@@ -145,7 +152,11 @@ export class ProjectService implements IProjectService {
     const recommendQuestionResult =
       await this.wrenAIAdaptor.generateRecommendationQuestions({
         manifest,
-        ...this.getProjectRecommendationQuestionsConfig(project),
+        ...this.getProjectRecommendationQuestionsConfig(
+          project,
+          maxCategories,
+          maxQuestions,
+        ),
       });
 
     const updatedProject = await this.projectRepository.updateOne(project.id, {
@@ -274,10 +285,16 @@ export class ProjectService implements IProjectService {
     );
   }
 
-  private getProjectRecommendationQuestionsConfig(project: Project) {
+  private getProjectRecommendationQuestionsConfig(
+    project: Project,
+    maxCategories?: number,
+    maxQuestions?: number,
+  ) {
     return {
-      maxCategories: config.projectRecommendationQuestionMaxCategories,
-      maxQuestions: config.projectRecommendationQuestionsMaxQuestions,
+      maxCategories:
+        maxCategories ?? config.projectRecommendationQuestionMaxCategories,
+      maxQuestions:
+        maxQuestions ?? config.projectRecommendationQuestionsMaxQuestions,
       regenerate: true,
       configuration: {
         language: WrenAILanguage[project.language] || WrenAILanguage.EN,

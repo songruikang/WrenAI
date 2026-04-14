@@ -199,6 +199,21 @@ class QuestionRecommendation:
         )
         trace_id = kwargs.get("trace_id")
 
+        # 设置 trace context：线程级推荐关联到原始问题（触发 put-if-absent 合并）
+        question_text = (
+            input.previous_questions[-1] if input.previous_questions
+            else f"[项目推荐] event={input.event_id}"
+        )
+        try:
+            from sitecustomize import set_trace_context
+            set_trace_context(
+                query_id=input.event_id,
+                question=question_text,
+                pipeline_name='question_recommendation',
+            )
+        except ImportError:
+            pass
+
         try:
             mdl = orjson.loads(input.mdl)
             retrieval_result = await self._pipelines["db_schema_retrieval"].run(

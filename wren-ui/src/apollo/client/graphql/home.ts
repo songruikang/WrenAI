@@ -346,14 +346,28 @@ export const GET_PROJECT_RECOMMENDATION_QUESTIONS = gql`
 `;
 
 export const GENERATE_PROJECT_RECOMMENDATION_QUESTIONS = gql`
-  mutation GenerateProjectRecommendationQuestions {
-    generateProjectRecommendationQuestions
+  mutation GenerateProjectRecommendationQuestions(
+    $maxCategories: Int
+    $maxQuestions: Int
+  ) {
+    generateProjectRecommendationQuestions(
+      maxCategories: $maxCategories
+      maxQuestions: $maxQuestions
+    )
   }
 `;
 
 export const GENERATE_THREAD_RECOMMENDATION_QUESTIONS = gql`
-  mutation GenerateThreadRecommendationQuestions($threadId: Int!) {
-    generateThreadRecommendationQuestions(threadId: $threadId)
+  mutation GenerateThreadRecommendationQuestions(
+    $threadId: Int!
+    $maxCategories: Int
+    $maxQuestions: Int
+  ) {
+    generateThreadRecommendationQuestions(
+      threadId: $threadId
+      maxCategories: $maxCategories
+      maxQuestions: $maxQuestions
+    )
   }
 `;
 

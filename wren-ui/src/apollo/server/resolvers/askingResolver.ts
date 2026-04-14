@@ -380,7 +380,8 @@ export class AskingResolver {
     ctx: IContext,
   ): Promise<Thread[]> {
     const threads = await ctx.askingService.listThreads();
-    return threads;
+    // Defensive: ensure summary is never null to avoid GraphQL non-nullable error
+    return threads.map((t) => ({ ...t, summary: t.summary || '(Untitled)' }));
   }
 
   public async createThreadResponse(

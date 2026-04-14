@@ -75,15 +75,33 @@ type SourceFilter = 'all' | 'user' | 'recommendation' | 'system';
 // ─── Constants ──────────────────────────────────────────────────────────
 
 const STEP_TYPE_LABELS: Record<string, string> = {
+  // 核心查询流程
+  intent_classification: '意图分类 / Intent Classification',
   schema_retrieval: '模式检索 / Schema Retrieval',
   column_pruning: '列裁剪 / Column Pruning',
   sql_generation: 'SQL生成 / SQL Generation',
+  sql_generation_reasoning: 'SQL推理 / SQL Generation Reasoning',
   sql_dryrun: '语法校验 / SQL Dry Run',
   sql_correction: 'SQL修正 / SQL Correction',
   sql_execution: 'SQL执行 / SQL Execution',
-  intent_classification: '意图分类 / Intent Classification',
+  // 后续增量步骤
+  sql_answer: 'SQL解答 / SQL Answer',
+  chart_generation: '图表生成 / Chart Generation',
+  chart_adjustment: '图表调整 / Chart Adjustment',
   question_recommendation: '推荐问题 / Question Recommendation',
+  // 辅助流程
+  data_assistance: '数据辅助 / Data Assistance',
+  misleading_assistance: '误导检测 / Misleading Assistance',
+  user_guide_assistance: '用户引导 / User Guide Assistance',
+  followup_sql_generation: '追问SQL / Followup SQL Generation',
+  followup_sql_generation_reasoning: '追问推理 / Followup SQL Reasoning',
+  sql_regeneration: 'SQL重生成 / SQL Regeneration',
+  sql_diagnosis: 'SQL诊断 / SQL Diagnosis',
+  sql_question: 'SQL反问 / SQL Question',
+  sql_tables_extraction: '表提取 / SQL Tables Extraction',
+  relationship_recommendation: '关系推荐 / Relationship Recommendation',
   semantics_description: '语义描述 / Semantics Description',
+  embedding: '向量化 / Embedding',
 };
 
 const STEP_TYPE_OPTIONS = Object.entries(STEP_TYPE_LABELS).map(
@@ -175,8 +193,15 @@ function getStepLabel(stepType: string): string {
 
 function formatTimestamp(ts: string | undefined | null): string {
   if (!ts) return '';
-  // Already in "YYYY-MM-DD HH:MM:SS" format from API
-  return ts.replace(/\.\d+$/, '').slice(0, 19);
+  try {
+    const d = new Date(ts);
+    if (isNaN(d.getTime())) return ts.slice(0, 19);
+    // 格式: YYYY-MM-DD HH:MM
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  } catch {
+    return ts.slice(0, 16);
+  }
 }
 
 // ─── Styled Components ──────────────────────────────────────────────────
@@ -795,6 +820,7 @@ export default function LogsPage() {
   const [autoRefresh, setAutoRefresh] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('by_query');
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>('all');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
 
   // By Query view state
   const [selectedQueryId, setSelectedQueryId] = useState<number | null>(null);
@@ -822,6 +848,9 @@ export default function LogsPage() {
         if (sourceFilter !== 'all') {
           params.set('source', sourceFilter);
         }
+        if (statusFilter !== 'all') {
+          params.set('status', statusFilter);
+        }
         const res = await fetch(`/api/traces?${params.toString()}`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data: TraceResponse = await res.json();
@@ -834,13 +863,13 @@ export default function LogsPage() {
         setLoading(false);
       }
     },
-    [currentPage, pageSize, sourceFilter],
+    [currentPage, pageSize, sourceFilter, statusFilter],
   );
 
   // Initial fetch and filter/page change
   useEffect(() => {
     fetchTraces(currentPage);
-  }, [currentPage, sourceFilter]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [currentPage, sourceFilter, statusFilter]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-refresh
   useEffect(() => {
@@ -1279,7 +1308,7 @@ export default function LogsPage() {
           </ViewTab>
         </ViewTabs>
 
-        {/* Source Filter */}
+        {/* Filters */}
         <Toolbar>
           <ToolbarLabel>来源:</ToolbarLabel>
           <Select
@@ -1296,6 +1325,23 @@ export default function LogsPage() {
               { value: 'user', label: '用户查询' },
               { value: 'recommendation', label: '推荐生成' },
               { value: 'system', label: '系统调用' },
+            ]}
+          />
+          <ToolbarLabel>状态:</ToolbarLabel>
+          <Select
+            size="small"
+            value={statusFilter}
+            onChange={(v) => {
+              setStatusFilter(v);
+              setCurrentPage(1);
+              setStepPage(1);
+            }}
+            style={{ width: 120 }}
+            options={[
+              { value: 'all', label: '全部状态' },
+              { value: 'success', label: '成功' },
+              { value: 'warn', label: '告警' },
+              { value: 'error', label: '错误' },
             ]}
           />
         </Toolbar>

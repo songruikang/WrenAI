@@ -139,6 +139,12 @@ class ChartService:
                 trace_id=trace_id,
             )
 
+            try:
+                from sitecustomize import set_trace_context
+                set_trace_context(query_id=query_id, question=chart_request.query)
+            except ImportError:
+                pass
+
             chart_generation_result = await self._pipelines["chart_generation"].run(
                 query=chart_request.query,
                 sql=chart_request.sql,
@@ -146,6 +152,7 @@ class ChartService:
                 language=chart_request.configurations.language,
                 remove_data_from_chart_schema=chart_request.remove_data_from_chart_schema,
                 custom_instruction=chart_request.custom_instruction,
+                query_id=query_id,
             )
             chart_result = chart_generation_result["post_process"]["results"]
 

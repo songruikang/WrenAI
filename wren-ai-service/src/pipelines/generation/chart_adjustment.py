@@ -115,9 +115,17 @@ def prompt(
 async def generate_chart_adjustment(
     prompt: dict,
     generator: Any,
+    query_id: str,
     generator_name: str,
 ) -> dict:
-    return await generator(prompt=prompt.get("prompt")), generator_name
+    try:
+        from sitecustomize import set_trace_context
+        set_trace_context(pipeline_name='chart_adjustment')
+    except ImportError:
+        pass
+    return await generator(
+        prompt=prompt.get("prompt"), query_id=query_id
+    ), generator_name
 
 
 @observe(capture_input=False)
@@ -184,6 +192,7 @@ class ChartAdjustment(BasicPipeline):
         chart_schema: dict,
         data: dict,
         language: str,
+        query_id: str = "",
     ) -> dict:
         logger.info("Chart Adjustment pipeline is running...")
 
@@ -196,6 +205,7 @@ class ChartAdjustment(BasicPipeline):
                 "chart_schema": chart_schema,
                 "data": data,
                 "language": language,
+                "query_id": query_id,
                 **self._components,
                 **self._configs,
             },

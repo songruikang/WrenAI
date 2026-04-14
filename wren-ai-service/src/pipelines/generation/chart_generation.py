@@ -87,13 +87,17 @@ def prompt(
 
 @observe(as_type="generation", capture_input=False)
 @trace_cost
-async def generate_chart(prompt: dict, generator: Any, generator_name: str) -> dict:
+async def generate_chart(
+    prompt: dict, generator: Any, query_id: str, generator_name: str
+) -> dict:
     try:
         from sitecustomize import set_trace_context
         set_trace_context(pipeline_name='chart_generation')
     except ImportError:
         pass
-    return await generator(prompt=prompt.get("prompt")), generator_name
+    return await generator(
+        prompt=prompt.get("prompt"), query_id=query_id
+    ), generator_name
 
 
 @observe(capture_input=False)
@@ -163,6 +167,7 @@ class ChartGeneration(BasicPipeline):
         language: str,
         remove_data_from_chart_schema: bool = True,
         custom_instruction: Optional[str] = None,
+        query_id: str = "",
     ) -> dict:
         logger.info("Chart Generation pipeline is running...")
         return await self._pipe.execute(
@@ -174,6 +179,7 @@ class ChartGeneration(BasicPipeline):
                 "language": language,
                 "remove_data_from_chart_schema": remove_data_from_chart_schema,
                 "custom_instruction": custom_instruction or "",
+                "query_id": query_id,
                 **self._components,
                 **self._configs,
             },

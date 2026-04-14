@@ -261,28 +261,51 @@ function buildGroup(queryId: string, events: RawTraceEvent[]): GroupedQuery {
 
 // --- Import new JSONL lines into SQLite ----------------------------------
 
+// Follow-up pipelines that should be merged into existing trace_query
+// instead of creating a new entry (put-if-absent)
+const FOLLOWUP_STEP_TYPES = new Set([
+  'sql_answer',
+  'chart_generation',
+  'chart_adjustment',
+  'question_recommendation',
+]);
+
 function importNewLines(db: Database.Database) {
   if (!fs.existsSync(TRACE_FILE)) return;
 
-  // 用文件大小判断是否有新内容（避免读取整个文件）
   const stat = fs.statSync(TRACE_FILE);
   if (stat.size <= lastImportedByteOffset) {
-    // 文件可能被 rotation 截断了，重置
     if (stat.size < lastImportedByteOffset) {
       lastImportedByteOffset = 0;
     }
     return;
   }
 
-  // 只读取新增部分（从上次偏移量开始）
+  // 增量读取新内容
   const fd = fs.openSync(TRACE_FILE, 'r');
   const newSize = stat.size - lastImportedByteOffset;
-  const buffer = Buffer.alloc(Math.min(newSize, 10 * 1024 * 1024)); // 单次最多读 10MB
-  fs.readSync(fd, buffer, 0, buffer.length, lastImportedByteOffset);
+  const buffer = Buffer.alloc(Math.min(newSize, 10 * 1024 * 1024));
+  const bytesRead = fs.readSync(
+    fd,
+    buffer,
+    0,
+    buffer.length,
+    lastImportedByteOffset,
+  );
   fs.closeSync(fd);
 
-  const newContent = buffer.toString('utf-8');
-  const newLines = newContent.split('\n').filter(Boolean);
+  // UTF-8 安全：只处理到最后一个完整行（避免在多字节字符中间截断）
+  const lastNewline = buffer.lastIndexOf(0x0a, bytesRead - 1);
+  if (lastNewline < 0) {
+    // 没有完整行，等下次有更多数据再处理
+    return;
+  }
+
+  const safeContent = buffer.subarray(0, lastNewline + 1).toString('utf-8');
+  const newLines = safeContent.split('\n').filter(Boolean);
+
+  // 只推进到最后一个完整行的位置
+  lastImportedByteOffset += lastNewline + 1;
 
   const newEvents: RawTraceEvent[] = [];
   for (const line of newLines) {
@@ -292,12 +315,6 @@ function importNewLines(db: Database.Database) {
       // skip malformed lines
     }
   }
-
-  lastImportedByteOffset = Math.min(
-    lastImportedByteOffset + buffer.length,
-    stat.size,
-  );
-
 
   if (!newEvents.length) {
     return;
@@ -319,25 +336,82 @@ function importNewLines(db: Database.Database) {
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
+  // put-if-absent: 查找同 question 的近期 trace_query
+  const findRecentQuery = db.prepare(`
+    SELECT id, total_duration_ms, total_prompt_tokens, total_completion_tokens,
+           finished_at, status
+    FROM trace_query
+    WHERE question = ? AND started_at > datetime(?, '-5 minutes')
+    ORDER BY started_at DESC LIMIT 1
+  `);
+
+  const getMaxStepIndex = db.prepare(
+    'SELECT MAX(step_index) AS max_idx FROM trace_step WHERE trace_query_id = ?',
+  );
+
+  const updateQueryAggregates = db.prepare(`
+    UPDATE trace_query
+    SET total_duration_ms = total_duration_ms + ?,
+        total_prompt_tokens = total_prompt_tokens + ?,
+        total_completion_tokens = total_completion_tokens + ?,
+        finished_at = MAX(finished_at, ?),
+        status = CASE WHEN ? = 'error' THEN 'error' ELSE status END
+    WHERE id = ?
+  `);
+
   const importAll = db.transaction(() => {
     for (const g of groups) {
-      const info = insertQuery.run(
-        g.query_id,
-        g.question,
-        g.source,
-        g.status,
-        g.total_duration_ms,
-        g.total_prompt_tokens,
-        g.total_completion_tokens,
-        g.started_at,
-        g.finished_at,
-      );
-      const queryId = info.lastInsertRowid;
+      // 判断是否为 follow-up 类步骤（所有步骤都是 follow-up 类型）
+      const isFollowup =
+        g.steps.length > 0 &&
+        g.steps.every((s) => FOLLOWUP_STEP_TYPES.has(s.step_type));
+
+      let targetQueryId: number | bigint | null = null;
+
+      // put-if-absent: follow-up 步骤尝试合并到已有的 trace_query
+      if (isFollowup && g.question) {
+        const existing = findRecentQuery.get(
+          g.question,
+          g.started_at || new Date().toISOString(),
+        ) as any;
+        if (existing) {
+          targetQueryId = existing.id;
+          // 更新聚合字段
+          updateQueryAggregates.run(
+            g.total_duration_ms,
+            g.total_prompt_tokens,
+            g.total_completion_tokens,
+            g.finished_at,
+            g.status,
+            existing.id,
+          );
+        }
+      }
+
+      // 没有匹配到已有记录，创建新 trace_query
+      if (targetQueryId === null) {
+        const info = insertQuery.run(
+          g.query_id,
+          g.question,
+          g.source,
+          g.status,
+          g.total_duration_ms,
+          g.total_prompt_tokens,
+          g.total_completion_tokens,
+          g.started_at,
+          g.finished_at,
+        );
+        targetQueryId = info.lastInsertRowid;
+      }
+
+      // 计算步骤起始索引（合并时接续已有步骤）
+      const maxIdx = getMaxStepIndex.get(targetQueryId) as any;
+      const startIdx = (maxIdx?.max_idx ?? -1) + 1;
 
       for (const s of g.steps) {
         insertStep.run(
-          queryId,
-          s.step_index,
+          targetQueryId,
+          startIdx + s.step_index,
           s.step_type,
           s.model,
           s.status,

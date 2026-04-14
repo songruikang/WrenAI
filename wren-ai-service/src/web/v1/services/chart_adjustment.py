@@ -146,6 +146,12 @@ class ChartAdjustmentService:
                 trace_id=trace_id,
             )
 
+            try:
+                from sitecustomize import set_trace_context
+                set_trace_context(query_id=query_id, question=chart_adjustment_request.query)
+            except ImportError:
+                pass
+
             chart_adjustment_result = await self._pipelines["chart_adjustment"].run(
                 query=chart_adjustment_request.query,
                 sql=chart_adjustment_request.sql,
@@ -153,6 +159,7 @@ class ChartAdjustmentService:
                 chart_schema=chart_adjustment_request.chart_schema,
                 data=sql_data,
                 language=chart_adjustment_request.configurations.language,
+                query_id=query_id,
             )
             chart_result = chart_adjustment_result["post_process"]["results"]
 

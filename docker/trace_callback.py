@@ -24,15 +24,18 @@ _lock = threading.Lock()
 _ctx_query_id: ContextVar[str | None] = ContextVar("trace_query_id", default=None)
 _ctx_pipeline_name: ContextVar[str | None] = ContextVar("trace_pipeline_name", default=None)
 _ctx_question: ContextVar[str | None] = ContextVar("trace_question", default=None)
+_ctx_source: ContextVar[str | None] = ContextVar("trace_source", default=None)
 
 
-def set_trace_context(query_id=None, pipeline_name=None, question=None):
+def set_trace_context(query_id=None, pipeline_name=None, question=None, source=None):
     if query_id is not None:
         _ctx_query_id.set(query_id)
     if pipeline_name is not None:
         _ctx_pipeline_name.set(pipeline_name)
     if question is not None:
         _ctx_question.set(question)
+    if source is not None:
+        _ctx_source.set(source)
 
 
 def get_trace_context():
@@ -40,6 +43,7 @@ def get_trace_context():
         "query_id": _ctx_query_id.get(),
         "pipeline_name": _ctx_pipeline_name.get(),
         "question": _ctx_question.get(),
+        "source": _ctx_source.get(),
     }
 
 
@@ -145,7 +149,7 @@ try:
                     "query_id": qid,
                     "pipeline": pipe,
                     "question": q,
-                    "source": "user" if qid else "system",
+                    "source": meta.get("trace_source") or ctx.get("source") or ("user" if qid else "system"),
                     "model": model,
                     "duration_ms": duration_ms,
                     "tokens": usage,
@@ -203,7 +207,7 @@ try:
                     "query_id": qid,
                     "pipeline": pipe,
                     "question": q,
-                    "source": "user" if qid else "system",
+                    "source": meta.get("trace_source") or ctx.get("source") or ("user" if qid else "system"),
                     "model": kwargs.get("model", "unknown"),
                     "duration_ms": duration_ms,
                     "error": error_msg,

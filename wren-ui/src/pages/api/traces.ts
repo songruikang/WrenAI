@@ -12,8 +12,7 @@ const TRACE_FILE = path.join(
 
 const DB_PATH = process.env.SQLITE_FILE || '/app/data/db.sqlite3';
 
-// Time windows for grouping events into the same query
-const SAME_QUERY_ID_WINDOW_MS = 30_000; // 30 s for events sharing a query_id
+// Time window for grouping legacy events without query_id
 const UNKNOWN_GROUP_WINDOW_MS = 5_000; // 5 s for legacy events without query_id
 
 // --- In-memory state for incremental import ------------------------------
@@ -117,6 +116,7 @@ function ensureTables(db: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_trace_query_started ON trace_query(started_at);
     CREATE INDEX IF NOT EXISTS idx_trace_query_status  ON trace_query(status);
     CREATE INDEX IF NOT EXISTS idx_trace_query_source  ON trace_query(source);
+    CREATE INDEX IF NOT EXISTS idx_trace_query_question ON trace_query(question);
     CREATE INDEX IF NOT EXISTS idx_trace_step_type     ON trace_step(step_type);
     CREATE INDEX IF NOT EXISTS idx_trace_step_query    ON trace_step(trace_query_id);
   `);
@@ -140,25 +140,14 @@ function groupEvents(events: RawTraceEvent[]): GroupedQuery[] {
 
   const groups: GroupedQuery[] = [];
 
-  // 2. Group named query_id events: split if time gap > SAME_QUERY_ID_WINDOW_MS
+  // 2. Group named query_id events: same query_id = same record, no time split
   for (const [qid, evts] of Object.entries(byQueryId)) {
     const sorted = evts.sort(
       (a, b) =>
         new Date(a.timestamp || 0).getTime() -
         new Date(b.timestamp || 0).getTime(),
     );
-    let bucket: RawTraceEvent[] = [sorted[0]];
-
-    for (let i = 1; i < sorted.length; i++) {
-      const prev = new Date(sorted[i - 1].timestamp || 0).getTime();
-      const curr = new Date(sorted[i].timestamp || 0).getTime();
-      if (curr - prev > SAME_QUERY_ID_WINDOW_MS) {
-        groups.push(buildGroup(qid, bucket));
-        bucket = [];
-      }
-      bucket.push(sorted[i]);
-    }
-    if (bucket.length) groups.push(buildGroup(qid, bucket));
+    groups.push(buildGroup(qid, sorted));
   }
 
   // 3. Group unknowns by time proximity
@@ -267,7 +256,6 @@ const FOLLOWUP_STEP_TYPES = new Set([
   'sql_answer',
   'chart_generation',
   'chart_adjustment',
-  'question_recommendation',
 ]);
 
 function importNewLines(db: Database.Database) {

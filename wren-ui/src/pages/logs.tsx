@@ -657,9 +657,19 @@ function StatusBadgeComp({ status }: { status: string }) {
 function CopyButton({ text }: { text: string }) {
   const handleCopy = (e: React.MouseEvent) => {
     e.stopPropagation();
-    navigator.clipboard.writeText(text || '').then(() => {
-      message.success('Copied!');
-    });
+    const value = text || '';
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(value).then(
+          () => message.success('Copied!'),
+          () => fallbackCopy(value),
+        );
+      } else {
+        fallbackCopy(value);
+      }
+    } catch {
+      fallbackCopy(value);
+    }
   };
   return (
     <Button
@@ -672,6 +682,22 @@ function CopyButton({ text }: { text: string }) {
       Copy
     </Button>
   );
+}
+
+function fallbackCopy(text: string) {
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.left = '-9999px';
+  document.body.appendChild(ta);
+  ta.select();
+  try {
+    document.execCommand('copy');
+    message.success('Copied!');
+  } catch {
+    message.error('复制失败，请手动复制');
+  }
+  document.body.removeChild(ta);
 }
 
 const PREVIEW_LIMIT = 500;

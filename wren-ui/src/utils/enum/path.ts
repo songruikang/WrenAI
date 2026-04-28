@@ -14,4 +14,5 @@ export enum Path {
   APIManagementHistory = '/api-management/history',
   QuerySQL = '/query',
   Logs = '/logs',
+  ChartSQL = '/chart-sql',
 }

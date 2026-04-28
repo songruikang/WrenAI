@@ -18,13 +18,22 @@ export default async function handler(
     return res.status(400).json({ error: 'question and data are required' });
   }
 
+  const isMock = mock !== false;
+  console.log(
+    `[chart_engine] mode=${isMock ? 'mock' : 'LLM'} question="${question}" data_rows=${data?.length || 0}`,
+  );
+
   try {
+    const startTime = Date.now();
     const response = await axios.post(
       `${CHART_ENGINE_ENDPOINT}/generate`,
-      { question, sql: sql || '', data, mock: mock !== false },
-      { timeout: 120000, headers: { 'Content-Type': 'application/json' } },
+      { question, sql: sql || '', data, mock: isMock },
+      { timeout: 300000, headers: { 'Content-Type': 'application/json' } },
     );
 
+    console.log(
+      `[chart_engine] done in ${Date.now() - startTime}ms type=${response.data?.chart_type}`,
+    );
     return res.status(200).json(response.data);
   } catch (error: any) {
     if (error?.code === 'ECONNREFUSED' || error?.code === 'ENOTFOUND') {

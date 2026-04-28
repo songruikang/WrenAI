@@ -132,6 +132,7 @@ export default function ChartSqlPage() {
   const [sql, setSql] = useState('');
   const [question, setQuestion] = useState('');
   const [chartMode, setChartMode] = useState(false);
+  const [useLLM, setUseLLM] = useState(false);
   const [loading, setLoading] = useState(false);
   const [sqlResult, setSqlResult] = useState<SqlResult | null>(null);
   const [chartResult, setChartResult] = useState<ChartResult | null>(null);
@@ -229,7 +230,7 @@ export default function ChartSqlPage() {
             question: question.trim(),
             sql: sql.trim(),
             data: sqlData.records,
-            mock: true,
+            mock: !useLLM,
           }),
         });
 
@@ -500,6 +501,15 @@ export default function ChartSqlPage() {
                 checkedChildren="Chart"
                 unCheckedChildren="SQL"
               />
+              {chartMode && (
+                <Switch
+                  checked={useLLM}
+                  onChange={setUseLLM}
+                  checkedChildren="LLM"
+                  unCheckedChildren="Mock"
+                  size="small"
+                />
+              )}
               {chartMode && (
                 <Input
                   placeholder="输入问题（如：各厂商设备数量对比）"

@@ -101,12 +101,29 @@ interface SqlResult {
   totalRows: number;
 }
 
+interface PipelineStep {
+  name: string;
+  duration_ms: number;
+  input: Record<string, unknown>;
+  output: Record<string, unknown>;
+}
+
+interface LLMTrace {
+  model: string;
+  system_prompt: string;
+  user_prompt: string;
+  response: string;
+  duration_ms: number;
+}
+
 interface ChartResult {
   chart_type: string;
   echarts_option: Record<string, unknown>;
   reasoning: string;
   warnings: string[];
   fallback: boolean;
+  pipeline: PipelineStep[];
+  llm_trace: LLMTrace | null;
 }
 
 // ─── Component ───────────────────────────────────────────────────
@@ -324,6 +341,153 @@ export default function ChartSqlPage() {
     return <ChartContainer ref={chartRef} />;
   };
 
+  // Debug/Pipeline tab 内容
+  const renderDebugContent = () => {
+    if (!chartResult?.pipeline || chartResult.pipeline.length === 0) {
+      return (
+        <div style={{ textAlign: 'center', padding: 60, color: '#999' }}>
+          执行 Chart 模式后，pipeline 详情将在这里显示
+        </div>
+      );
+    }
+
+    const codeBlockStyle: React.CSSProperties = {
+      background: '#1e1e1e',
+      color: '#d4d4d4',
+      padding: '12px 16px',
+      borderRadius: 6,
+      fontSize: 12,
+      fontFamily: "'Menlo', 'Monaco', monospace",
+      overflow: 'auto',
+      maxHeight: 300,
+      whiteSpace: 'pre-wrap',
+      wordBreak: 'break-all',
+    };
+
+    const stepCardStyle: React.CSSProperties = {
+      border: '1px solid #e8e8e8',
+      borderRadius: 8,
+      padding: 16,
+      marginBottom: 12,
+      background: '#fafafa',
+    };
+
+    const labelStyle: React.CSSProperties = {
+      fontSize: 11,
+      color: '#999',
+      textTransform: 'uppercase' as const,
+      letterSpacing: 1,
+      marginBottom: 4,
+    };
+
+    return (
+      <div style={{ overflow: 'auto', maxHeight: 'calc(100vh - 300px)' }}>
+        {/* Pipeline Steps */}
+        <div style={{ marginBottom: 24 }}>
+          <Typography.Title level={5} style={{ marginBottom: 12 }}>
+            Pipeline Steps
+          </Typography.Title>
+
+          {chartResult.pipeline.map((step, i) => (
+            <div key={i} style={stepCardStyle}>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: 8,
+                }}
+              >
+                <Space>
+                  <span
+                    style={{
+                      display: 'inline-block',
+                      width: 24,
+                      height: 24,
+                      borderRadius: '50%',
+                      background: '#5470c6',
+                      color: '#fff',
+                      textAlign: 'center',
+                      lineHeight: '24px',
+                      fontSize: 12,
+                      fontWeight: 'bold',
+                    }}
+                  >
+                    {i + 1}
+                  </span>
+                  <Text strong>{step.name}</Text>
+                </Space>
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                  {step.duration_ms}ms
+                </Text>
+              </div>
+
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr',
+                  gap: 12,
+                }}
+              >
+                <div>
+                  <div style={labelStyle}>Input</div>
+                  <pre style={codeBlockStyle}>
+                    {JSON.stringify(step.input, null, 2)}
+                  </pre>
+                </div>
+                <div>
+                  <div style={labelStyle}>Output</div>
+                  <pre style={codeBlockStyle}>
+                    {JSON.stringify(step.output, null, 2)}
+                  </pre>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* ECharts Option (最终给 ECharts 的输入) */}
+        <div style={{ marginBottom: 24 }}>
+          <Typography.Title level={5} style={{ marginBottom: 12 }}>
+            ECharts Option (图表输入)
+          </Typography.Title>
+          <pre style={codeBlockStyle}>
+            {JSON.stringify(chartResult.echarts_option, null, 2)}
+          </pre>
+        </div>
+
+        {/* LLM Trace */}
+        {chartResult.llm_trace && (
+          <div style={{ marginBottom: 24 }}>
+            <Typography.Title level={5} style={{ marginBottom: 12 }}>
+              LLM Trace ({chartResult.llm_trace.model},{' '}
+              {chartResult.llm_trace.duration_ms}ms)
+            </Typography.Title>
+
+            <div style={{ marginBottom: 12 }}>
+              <div style={labelStyle}>System Prompt</div>
+              <pre style={{ ...codeBlockStyle, maxHeight: 200 }}>
+                {chartResult.llm_trace.system_prompt}
+              </pre>
+            </div>
+
+            <div style={{ marginBottom: 12 }}>
+              <div style={labelStyle}>User Prompt</div>
+              <pre style={codeBlockStyle}>
+                {chartResult.llm_trace.user_prompt}
+              </pre>
+            </div>
+
+            <div>
+              <div style={labelStyle}>Response</div>
+              <pre style={codeBlockStyle}>{chartResult.llm_trace.response}</pre>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <SiderLayout loading={false}>
       <Container>
@@ -434,6 +598,12 @@ export default function ChartSqlPage() {
                 key="chart"
               >
                 {renderChartContent()}
+              </Tabs.TabPane>
+              <Tabs.TabPane
+                tab={`Pipeline${chartResult?.pipeline ? ` (${chartResult.pipeline.length} steps)` : ''}`}
+                key="debug"
+              >
+                {renderDebugContent()}
               </Tabs.TabPane>
             </Tabs>
           )}

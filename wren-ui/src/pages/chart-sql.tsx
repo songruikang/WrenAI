@@ -527,7 +527,11 @@ export default function ChartSqlPage() {
                 onClick={handleExecute}
                 loading={loading}
               >
-                {chartMode ? '执行 + 画图' : '执行'}
+                {chartMode
+                  ? useLLM
+                    ? '执行 + LLM 画图'
+                    : '执行 + 画图'
+                  : '执行'}
               </Button>
               <Button icon={<ClearOutlined />} onClick={handleClear}>
                 清空
@@ -562,7 +566,13 @@ export default function ChartSqlPage() {
             <div style={{ textAlign: 'center', padding: 60 }}>
               <Spin
                 size="large"
-                tip={chartMode ? '执行 SQL + 生成图表...' : '执行 SQL...'}
+                tip={
+                  chartMode && useLLM
+                    ? '执行 SQL + LLM 生成图表（可能需要 30s+）...'
+                    : chartMode
+                      ? '执行 SQL + 生成图表...'
+                      : '执行 SQL...'
+                }
               />
             </div>
           ) : error ? (

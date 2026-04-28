@@ -86,6 +86,23 @@ services:
     networks:
       - wren
 
+  chart-engine:
+    # [自定义] 图表生成引擎 — SQL 查询结果 → ECharts option JSON
+    image: chart-engine:latest
+    build:
+      context: ../../chart_engine
+      dockerfile: Dockerfile
+      network: host
+    restart: on-failure
+    platform: ${PLATFORM}
+    expose:
+      - ${CHART_ENGINE_PORT}
+    environment:
+      CHART_LLM_MODEL: ${CHART_LLM_MODEL:-ollama_chat/qwen3:32b}
+      CHART_LLM_API_BASE: ${CHART_LLM_API_BASE:-http://10.220.239.55:11343}
+    networks:
+      - wren
+
   wren-ui:
     image: wrenai-wren-ui:latest
     build:
@@ -100,6 +117,7 @@ services:
       WREN_ENGINE_ENDPOINT: http://wren-engine:${WREN_ENGINE_PORT}
       WREN_AI_ENDPOINT: http://wren-ai-service:${WREN_AI_SERVICE_PORT}
       IBIS_SERVER_ENDPOINT: http://ibis-server:${IBIS_SERVER_PORT}
+      CHART_ENGINE_ENDPOINT: http://chart-engine:${CHART_ENGINE_PORT}
       GENERATION_MODEL: ${GENERATION_MODEL}
       WREN_ENGINE_PORT: ${WREN_ENGINE_PORT}
       WREN_AI_SERVICE_VERSION: ${WREN_AI_SERVICE_VERSION}

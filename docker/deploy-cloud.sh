@@ -90,6 +90,14 @@ do_build() {
         -t wrenai-wren-ai-service:latest -f docker/Dockerfile.cloud .
     ok "wren-ai-service 构建完成"
 
+    info "构建 chart-engine 镜像"
+    cd "$WRENAI_DIR/../chart_engine"
+    DOCKER_BUILDKIT=0 docker build \
+        --build-arg HTTP_PROXY=http://$PROXY_ADDR \
+        --build-arg HTTPS_PROXY=http://$PROXY_ADDR \
+        -t chart-engine:latest -f Dockerfile .
+    ok "chart-engine 构建完成"
+
     stop_socat
 }
 

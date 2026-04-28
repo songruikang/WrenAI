@@ -126,23 +126,20 @@ export default function ChartSqlPage() {
   const echartsRef = useRef<any>(null);
 
   // 渲染 ECharts
-  const renderChart = useCallback(
-    async (option: Record<string, unknown>) => {
-      if (!chartRef.current) return;
+  const renderChart = useCallback(async (option: Record<string, unknown>) => {
+    if (!chartRef.current) return;
 
-      // 动态 import echarts 避免 SSR
-      const echarts = await import('echarts');
+    // 动态 import echarts 避免 SSR
+    const echarts = await import('echarts');
 
-      if (echartsRef.current) {
-        echartsRef.current.dispose();
-      }
+    if (echartsRef.current) {
+      echartsRef.current.dispose();
+    }
 
-      const chart = echarts.init(chartRef.current);
-      chart.setOption(option as any);
-      echartsRef.current = chart;
-    },
-    [],
-  );
+    const chart = echarts.init(chartRef.current);
+    chart.setOption(option as any);
+    echartsRef.current = chart;
+  }, []);
 
   // chart 结果或 tab 切换时重新渲染
   useEffect(() => {
@@ -152,7 +149,10 @@ export default function ChartSqlPage() {
       !chartResult.echarts_option.table &&
       !chartResult.echarts_option.kpi_card
     ) {
-      const timer = setTimeout(() => renderChart(chartResult.echarts_option), 100);
+      const timer = setTimeout(
+        () => renderChart(chartResult.echarts_option),
+        100,
+      );
       return () => clearTimeout(timer);
     }
   }, [chartResult, activeTab, renderChart]);
@@ -297,9 +297,7 @@ export default function ChartSqlPage() {
     if (chartResult.echarts_option?.kpi_card) {
       return (
         <div style={{ textAlign: 'center', padding: '60px 20px' }}>
-          <div
-            style={{ fontSize: 56, fontWeight: 'bold', color: '#5470c6' }}
-          >
+          <div style={{ fontSize: 56, fontWeight: 'bold', color: '#5470c6' }}>
             {String(chartResult.echarts_option.value ?? 0)}
           </div>
           <div style={{ fontSize: 16, color: '#666', marginTop: 8 }}>
@@ -390,9 +388,7 @@ export default function ChartSqlPage() {
             <div style={{ textAlign: 'center', padding: 60 }}>
               <Spin
                 size="large"
-                tip={
-                  chartMode ? '执行 SQL + 生成图表...' : '执行 SQL...'
-                }
+                tip={chartMode ? '执行 SQL + 生成图表...' : '执行 SQL...'}
               />
             </div>
           ) : error ? (

@@ -2,7 +2,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import axios from 'axios';
 
 const CHART_ENGINE_ENDPOINT =
-  process.env.CHART_ENGINE_ENDPOINT || 'http://localhost:8100';
+  process.env.CHART_ENGINE_ENDPOINT || 'http://chart-engine:8100';
 
 export default async function handler(
   req: NextApiRequest,

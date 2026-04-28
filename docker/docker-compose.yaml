@@ -129,7 +129,7 @@ services:
           cpus: '0.5'
           memory: 512M
     expose:
-      - ${CHART_ENGINE_PORT}
+      - 8100
     environment:
       CHART_LLM_MODEL: ${CHART_LLM_MODEL:-ollama_chat/qwen3:32b}
       CHART_LLM_API_BASE: ${CHART_LLM_API_BASE:-http://10.220.239.55:11343}
@@ -157,7 +157,7 @@ services:
       WREN_ENGINE_ENDPOINT: http://wren-engine:${WREN_ENGINE_PORT}
       WREN_AI_ENDPOINT: http://wren-ai-service:${WREN_AI_SERVICE_PORT}
       IBIS_SERVER_ENDPOINT: http://ibis-server:${IBIS_SERVER_PORT}
-      CHART_ENGINE_ENDPOINT: http://chart-engine:${CHART_ENGINE_PORT}
+      CHART_ENGINE_ENDPOINT: http://chart-engine:8100
       # this is for telemetry to know the model, i think ai-service might be able to provide a endpoint to get the information
       GENERATION_MODEL: ${GENERATION_MODEL}
       # telemetry

@@ -11,7 +11,7 @@ type: llm
 provider: litellm_llm
 models:
   - model: ollama_chat/qwen3:32b
-    api_base: http://10.220.239.55:11434
+    api_base: http://10.220.239.55:11343
     alias: default
     timeout: 600
     kwargs:
